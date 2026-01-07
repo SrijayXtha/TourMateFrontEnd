@@ -1,21 +1,26 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React from "react";
+import React, { useState } from "react";
 import {
-    Alert,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
+
+const profileImage = require("../assets/images/profile.png");
 
 interface TouristHomeProps {
   onNavigate: (screen: string) => void;
 }
 
 export function TouristHome({ onNavigate }: TouristHomeProps) {
-  const cards = [
+  const [activeTab, setActiveTab] = useState("home");
+
+  const safetyCards = [
     {
       id: "my-bookings",
       title: "My Bookings",
@@ -24,22 +29,8 @@ export function TouristHome({ onNavigate }: TouristHomeProps) {
       description: "View your trips",
     },
     {
-      id: "explore-guides",
-      title: "Explore Guides",
-      icon: "account-multiple" as const,
-      color: "#14B8A6",
-      description: "Find local experts",
-    },
-    {
-      id: "explore-hotels",
-      title: "Explore Hotels",
-      icon: "hotel" as const,
-      color: "#6366F1",
-      description: "Book accommodations",
-    },
-    {
       id: "sos",
-      title: "SOS Emergency",
+      title: "SOS",
       icon: "alert-circle" as const,
       color: "#EF4444",
       description: "Get immediate help",
@@ -60,6 +51,38 @@ export function TouristHome({ onNavigate }: TouristHomeProps) {
     },
   ];
 
+  const places = [
+    {
+      id: 1,
+      name: "Everest Base Camp",
+      category: "Trekking",
+      image: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxldmVyZXN0fGVufDB8fHx8fDE3NjM1MTc1MzB8MA&ixlib=rb-4.1.0&q=80&w=500",
+    },
+    {
+      id: 2,
+      name: "Pokhara",
+      category: "Lakeside",
+      image: require("../assets/images/pokhara.jpg"),
+    },
+  ];
+
+  const guides = [
+    {
+      id: 1,
+      name: "Ram Shah",
+      region: "Chitwan Region",
+      rating: 4.6,
+      image: profileImage,
+    },
+    {
+      id: 2,
+      name: "Pema Sherpa",
+      region: "Everest Region",
+      rating: 4.9,
+      image: profileImage,
+    },
+  ];
+
   const handleLearnMore = () => {
     Alert.alert("Featured Destination", "Swiss Alps Adventure", [
       {
@@ -76,84 +99,193 @@ export function TouristHome({ onNavigate }: TouristHomeProps) {
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Welcome, Explorer!</Text>
-        <Text style={styles.headerSubtitle}>Ready for your next adventure?</Text>
-      </View>
+    <View style={styles.container}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Welcome, Explorer!</Text>
+          <Text style={styles.headerSubtitle}>Ready for your next adventure?</Text>
+        </View>
 
-      {/* Quick Stats */}
-      <View style={styles.statsContainer}>
-        <View style={styles.statsCard}>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>3</Text>
-            <Text style={styles.statLabel}>Active Trips</Text>
-          </View>
-          <View style={[styles.statItem, styles.statItemBorder]}>
-            <Text style={styles.statNumber}>12</Text>
-            <Text style={styles.statLabel}>Saved Places</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>5</Text>
-            <Text style={styles.statLabel}>Reviews</Text>
+        {/* Quick Stats */}
+        <View style={styles.statsContainer}>
+          <View style={styles.statsCard}>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>3</Text>
+              <Text style={styles.statLabel}>Active Trips</Text>
+            </View>
+            <View style={[styles.statItem, styles.statItemBorder]}>
+              <Text style={styles.statNumber}>12</Text>
+              <Text style={styles.statLabel}>Saved Places</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>5</Text>
+              <Text style={styles.statLabel}>Reviews</Text>
+            </View>
           </View>
         </View>
-      </View>
 
-      {/* Feature Cards */}
-      <View style={styles.cardsSection}>
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
-
-        <View style={styles.cardsGrid}>
-          {cards.map((card) => (
-            <TouchableOpacity
-              key={card.id}
-              style={styles.card}
-              onPress={() => onNavigate(card.id)}
-              activeOpacity={0.7}
-            >
-              <View
-                style={[
-                  styles.cardIconContainer,
-                  { backgroundColor: card.color },
-                ]}
-              >
-                <MaterialCommunityIcons
-                  name={card.icon as any}
-                  size={24}
-                  color="#FFFFFF"
-                />
-              </View>
-              <Text style={styles.cardTitle}>{card.title}</Text>
-              <Text style={styles.cardDescription}>{card.description}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      {/* Featured Destination */}
-      <View style={styles.featuredSection}>
-        <Text style={styles.sectionTitle}>Featured Destination</Text>
-        <View style={styles.featuredCard}>
-          <Image
-            source={{
-              uri: "https://images.unsplash.com/photo-1758919679904-47f070132907?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx0cmF2ZWwlMjBkZXN0aW5hdGlvbiUyMG5hdHVyZXxlbnwxfHx8fDE3NjM1MTc1MzB8MA&ixlib=rb-4.1.0&q=80&w=1080",
-            }}
-            style={styles.featuredImage}
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <MaterialCommunityIcons name="magnify" size={20} color="#9CA3AF" />
+          <TextInput
+            placeholder="Search Destinations,guides..."
+            placeholderTextColor="#9CA3AF"
+            style={styles.searchInput}
           />
-          <View style={styles.featuredContent}>
-            <Text style={styles.featuredTitle}>Swiss Alps Adventure</Text>
-            <Text style={styles.featuredDescription}>
-              Experience breathtaking mountain views
-            </Text>
-            <TouchableOpacity onPress={handleLearnMore}>
-              <Text style={styles.learnMoreButton}>Learn more →</Text>
-            </TouchableOpacity>
+        </View>
+
+        {/* Discover Popular Places */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Discover Popular Places</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.placesScroll}
+          >
+            {places.map((place) => (
+              <TouchableOpacity key={place.id} style={styles.placeCard}>
+                <Image source={typeof place.image === 'string' ? { uri: place.image } : place.image} style={styles.placeImage} />
+                <View style={styles.placeInfo}>
+                  <Text style={styles.placeName}>{place.name}</Text>
+                  <Text style={styles.placeCategory}>{place.category}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Connect With Top Guides */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Connect With Top Guides</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.guidesScroll}
+          >
+            {guides.map((guide) => (
+              <TouchableOpacity key={guide.id} style={styles.guideCard}>
+                <Image source={guide.image} style={styles.guideAvatar} />
+                <Text style={styles.guideName}>{guide.name}</Text>
+                <View style={styles.ratingContainer}>
+                  <MaterialCommunityIcons name="star" size={16} color="#FCD34D" />
+                  <Text style={styles.rating}>{guide.rating}</Text>
+                </View>
+                <Text style={styles.guideRegion}>{guide.region}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Quick Safety Actions */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Quick Safety Actions</Text>
+          <View style={styles.safetyGrid}>
+            {safetyCards.map((card) => (
+              <TouchableOpacity
+                key={card.id}
+                style={styles.safetyCard}
+                onPress={() => onNavigate(card.id)}
+              >
+                <View
+                  style={[
+                    styles.safetyIconContainer,
+                    { backgroundColor: card.color },
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name={card.icon as any}
+                    size={28}
+                    color="#FFFFFF"
+                  />
+                </View>
+                <Text style={styles.safetyTitle}>{card.title}</Text>
+                <Text style={styles.safetyDescription}>{card.description}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
+      </ScrollView>
+
+      {/* Bottom Navigation */}
+      <View style={styles.bottomNav}>
+        <TouchableOpacity
+          style={styles.navItem}
+          onPress={() => setActiveTab("home")}
+        >
+          <MaterialCommunityIcons
+            name="home"
+            size={24}
+            color={activeTab === "home" ? "#1B73E8" : "#9CA3AF"}
+          />
+          <Text
+            style={[
+              styles.navLabel,
+              activeTab === "home" && styles.navLabelActive,
+            ]}
+          >
+            Home
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.navItem}
+          onPress={() => setActiveTab("explore")}
+        >
+          <MaterialCommunityIcons
+            name="compass"
+            size={24}
+            color={activeTab === "explore" ? "#1B73E8" : "#9CA3AF"}
+          />
+          <Text
+            style={[
+              styles.navLabel,
+              activeTab === "explore" && styles.navLabelActive,
+            ]}
+          >
+            Explore
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.navItem}
+          onPress={() => setActiveTab("map")}
+        >
+          <MaterialCommunityIcons
+            name="map"
+            size={24}
+            color={activeTab === "map" ? "#1B73E8" : "#9CA3AF"}
+          />
+          <Text
+            style={[
+              styles.navLabel,
+              activeTab === "map" && styles.navLabelActive,
+            ]}
+          >
+            Map
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.navItem}
+          onPress={() => setActiveTab("profile")}
+        >
+          <MaterialCommunityIcons
+            name="account"
+            size={24}
+            color={activeTab === "profile" ? "#1B73E8" : "#9CA3AF"}
+          />
+          <Text
+            style={[
+              styles.navLabel,
+              activeTab === "profile" && styles.navLabelActive,
+            ]}
+          >
+            Profile
+          </Text>
+        </TouchableOpacity>
       </View>
-    </ScrollView>
+    </View>
   );
 }
 
@@ -162,11 +294,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F3F4F6",
   },
+  scrollView: {
+    flex: 1,
+  },
   header: {
     backgroundColor: "#1B73E8",
     paddingTop: 48,
     paddingBottom: 32,
     paddingHorizontal: 24,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
   },
   headerTitle: {
     fontSize: 28,
@@ -215,9 +352,30 @@ const styles = StyleSheet.create({
     color: "#4B5563",
     textAlign: "center",
   },
-  cardsSection: {
-    paddingHorizontal: 24,
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 24,
     marginBottom: 24,
+    paddingHorizontal: 12,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    height: 48,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 8,
+    color: "#1F2937",
+    fontSize: 14,
+  },
+  section: {
+    paddingHorizontal: 24,
+    marginBottom: 28,
   },
   sectionTitle: {
     fontSize: 18,
@@ -225,77 +383,148 @@ const styles = StyleSheet.create({
     color: "#1F2937",
     marginBottom: 16,
   },
-  cardsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    gap: 12,
+  placesScroll: {
+    marginHorizontal: -24,
+    paddingHorizontal: 24,
   },
-  card: {
-    width: "48%",
+  placeCard: {
+    marginRight: 12,
+    borderRadius: 16,
+    overflow: "hidden",
+    width: 180,
     backgroundColor: "#FFFFFF",
-    borderRadius: 24,
-    padding: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-  cardIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
+  placeImage: {
+    width: "100%",
+    height: 120,
+    backgroundColor: "#E5E7EB",
   },
-  cardTitle: {
+  placeInfo: {
+    padding: 12,
+  },
+  placeName: {
     fontSize: 14,
     fontWeight: "600",
     color: "#1F2937",
     marginBottom: 4,
   },
-  cardDescription: {
+  placeCategory: {
     fontSize: 12,
     color: "#9CA3AF",
   },
-  featuredSection: {
+  guidesScroll: {
+    marginHorizontal: -24,
     paddingHorizontal: 24,
-    marginBottom: 40,
   },
-  featuredCard: {
+  guideCard: {
+    marginRight: 16,
+    alignItems: "center",
     backgroundColor: "#FFFFFF",
-    borderRadius: 24,
-    overflow: "hidden",
+    borderRadius: 16,
+    padding: 16,
+    width: 140,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-  featuredImage: {
-    width: "100%",
-    height: 192,
-    backgroundColor: "#E5E7EB",
+  guideAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginBottom: 12,
   },
-  featuredContent: {
-    padding: 16,
-  },
-  featuredTitle: {
-    fontSize: 16,
-    fontWeight: "700",
+  guideName: {
+    fontSize: 14,
+    fontWeight: "600",
     color: "#1F2937",
     marginBottom: 4,
   },
-  featuredDescription: {
-    fontSize: 14,
-    color: "#4B5563",
+  ratingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  rating: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#1F2937",
+    marginLeft: 4,
+  },
+  guideRegion: {
+    fontSize: 11,
+    color: "#9CA3AF",
+    textAlign: "center",
+  },
+  safetyGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 20,
+  },
+  safetyCard: {
+    width: "48%",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 16,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  safetyIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 12,
   },
-  learnMoreButton: {
-    color: "#1B73E8",
+  safetyTitle: {
     fontSize: 14,
+    fontWeight: "600",
+    color: "#1F2937",
+    marginBottom: 4,
+  },
+  safetyDescription: {
+    fontSize: 12,
+    color: "#9CA3AF",
+    textAlign: "center",
+  },
+  bottomNav: {
+    flexDirection: "row",
+    backgroundColor: "#FFFFFF",
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+    paddingBottom: 8,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+  },
+  navItem: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 8,
+  },
+  navLabel: {
+    fontSize: 10,
+    color: "#9CA3AF",
+    marginTop: 4,
+  },
+  navLabelActive: {
+    color: "#1B73E8",
     fontWeight: "600",
   },
 });

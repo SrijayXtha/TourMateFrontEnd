@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import React, { useState } from "react";
 import {
+    ActivityIndicator,
     Alert,
     Image,
     ScrollView,
@@ -9,8 +10,9 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View
+    View,
 } from "react-native";
+import { authAPI } from "../constants/api";
 
 interface RegisterScreenProps {
   onRegister: (role: string) => void;
@@ -21,8 +23,6 @@ export function RegisterScreen({
   onRegister,
   onNavigateToLogin,
 }: RegisterScreenProps) {
-  const [step, setStep] = useState<"details" | "otp">("details");
-
   // Common fields
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
@@ -56,16 +56,14 @@ export function RegisterScreen({
     uri: string;
   } | null>(null);
 
-  // OTP
-  const [otp, setOtp] = useState("");
-  const [generatedOtp, setGeneratedOtp] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const roles = [
-    { id: "tourist", label: "Tourist", icon: "🎒", desc: "Explore and book tours" },
-    { id: "guide", label: "Guide", icon: "🧭", desc: "Offer tour services" },
-    { id: "hotel", label: "Hotel", icon: "🏨", desc: "List accommodations" },
+    { id: "tourist", label: "Tourist", image: require("../assets/images/tourist.png"), desc: "Explore and book tours" },
+    { id: "guide", label: "Guide", image: require("../assets/images/guide.png"), desc: "Offer tour services" },
+    { id: "hotel", label: "Hotel", image: require("../assets/images/hotel.png"), desc: "List accommodations" },
   ];
 
   const preferences = [
@@ -85,7 +83,15 @@ export function RegisterScreen({
     { label: "10+ years", value: "10+" },
   ];
 
-  const handleSendOtp = () => {
+  const handleVerifyOtp = () => {
+    // OTP verification not needed
+  };
+
+  const handleResendOtp = () => {
+    // Not needed
+  };
+
+  const handleRegister = async () => {
     // Validate common fields
     if (!fullName || !username || !email || !password || !confirmPassword || !phone) {
       Alert.alert("Error", "Please fill in all required fields");
@@ -122,40 +128,42 @@ export function RegisterScreen({
       }
     }
 
-    // Generate a random 6-digit OTP
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedOtp(otpCode);
-    setStep("otp");
+    setIsLoading(true);
+    try {
+      // Call the backend API
+      const response = await authAPI.register({
+        full_name: fullName,
+        email: email,
+        password: password,
+        phone: phone,
+        role: selectedRole,
+      });
 
-    // Show the OTP
-    Alert.alert("OTP Sent", `Your verification code is: ${otpCode}`, [
-      { text: "OK" },
-    ]);
-  };
-
-  const handleVerifyOtp = () => {
-    if (otp === generatedOtp) {
-      let message = "Account created successfully!";
+      // Success message based on role
+      let message = response.message || "Account created successfully!";
       if (selectedRole === "guide") {
         message = "Guide account created! Pending admin verification.";
       } else if (selectedRole === "hotel") {
         message = "Hotel account created! Pending admin verification.";
       }
-      Alert.alert("Success", message, [{ text: "OK" }]);
-      onRegister(selectedRole);
-    } else {
-      Alert.alert("Error", "Invalid OTP code. Please check and try again");
+      
+      Alert.alert("Success", message, [
+        { 
+          text: "OK", 
+          onPress: () => onRegister(selectedRole) 
+        }
+      ]);
+      console.log("Registration response:", response);
+    } catch (error: any) {
+      // Handle errors from backend
+      Alert.alert(
+        "Registration Failed",
+        error.message || "Unable to register. Please try again."
+      );
+      console.error("Registration error:", error);
+    } finally {
+      setIsLoading(false);
     }
-  };
-
-  const handleResendOtp = () => {
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedOtp(otpCode);
-    setOtp("");
-
-    Alert.alert("OTP Resent", `Your new verification code is: ${otpCode}`, [
-      { text: "OK" },
-    ]);
   };
 
   const handleFileUpload = async (type: "guide" | "hotel") => {
@@ -186,90 +194,6 @@ export function RegisterScreen({
       prev.includes(pref) ? prev.filter((p) => p !== pref) : [...prev, pref]
     );
   };
-
-  if (step === "otp") {
-    return (
-      <ScrollView
-        style={styles.container}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerContent}>
-            <View style={styles.logoContainer}>
-              <Image
-                source={require("../assets/images/logo_white.png")}
-                style={styles.logoImage}
-              />
-              <Text style={styles.logoText}>TourMate</Text>
-            </View>
-            <Text style={styles.headerSubtitle}>Verify your account</Text>
-          </View>
-        </View>
-
-        {/* OTP Form */}
-        <View style={styles.formContainer}>
-          <View style={styles.formCard}>
-            <TouchableOpacity
-              onPress={() => setStep("details")}
-              style={styles.backButton}
-            >
-              <MaterialCommunityIcons
-                name="arrow-left"
-                size={20}
-                color="#4B5563"
-              />
-              <Text style={styles.backButtonText}>Change details</Text>
-            </TouchableOpacity>
-
-            <Text style={styles.title}>Verify OTP</Text>
-            <Text style={styles.subtitle}>
-              Enter the 6-digit code sent to {phone}
-            </Text>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Enter OTP Code</Text>
-              <View style={styles.inputWrapper}>
-                <TextInput
-                  style={styles.otpInput}
-                  placeholder="000000"
-                  placeholderTextColor="#9CA3AF"
-                  value={otp}
-                  onChangeText={(text) =>
-                    setOtp(text.replace(/\D/g, "").slice(0, 6))
-                  }
-                  maxLength={6}
-                  keyboardType="numeric"
-                />
-              </View>
-              <Text style={styles.helperText}>
-                Check your messages for the 6-digit code
-              </Text>
-            </View>
-
-            <TouchableOpacity
-              style={[
-                styles.submitButton,
-                otp.length !== 6 && styles.submitButtonDisabled,
-              ]}
-              onPress={handleVerifyOtp}
-              disabled={otp.length !== 6}
-            >
-              <Text style={styles.submitButtonText}>
-                Verify & Create Account
-              </Text>
-            </TouchableOpacity>
-
-            <View style={styles.resendContainer}>
-              <TouchableOpacity onPress={handleResendOtp}>
-                <Text style={styles.resendText}>Resend Code</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </ScrollView>
-    );
-  }
 
   return (
     <ScrollView
@@ -313,7 +237,10 @@ export function RegisterScreen({
                     setSelectedRole(role.id as "tourist" | "guide" | "hotel")
                   }
                 >
-                  <Text style={styles.roleIcon}>{role.icon}</Text>
+                  <Image
+                    source={role.image}
+                    style={styles.roleImage}
+                  />
                   <Text style={styles.roleLabel}>{role.label}</Text>
                 </TouchableOpacity>
               ))}
@@ -733,10 +660,15 @@ export function RegisterScreen({
           )}
 
           <TouchableOpacity
-            style={styles.submitButton}
-            onPress={handleSendOtp}
+            style={[styles.submitButton, isLoading && styles.submitButtonDisabled]}
+            onPress={handleRegister}
+            disabled={isLoading}
           >
-            <Text style={styles.submitButtonText}>Register</Text>
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.submitButtonText}>Create Account</Text>
+            )}
           </TouchableOpacity>
 
           <View style={styles.loginContainer}>
@@ -842,9 +774,11 @@ const styles = StyleSheet.create({
     borderColor: "#1B73E8",
     backgroundColor: "rgba(27, 115, 232, 0.05)",
   },
-  roleIcon: {
-    fontSize: 24,
-    marginBottom: 4,
+  roleImage: {
+    width: 48,
+    height: 48,
+    resizeMode: "contain",
+    marginBottom: 8,
   },
   roleLabel: {
     fontSize: 12,
@@ -1008,7 +942,7 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   submitButtonDisabled: {
-    opacity: 0.5,
+    backgroundColor: "#9CA3AF",
   },
   submitButtonText: {
     color: "#FFFFFF",

@@ -39,7 +39,8 @@ export function GuideHome({ onNavigate }: GuideHomeProps) {
   };
 
   const getVerificationBadge = () => {
-    switch (verificationStatus) {
+    const status = verificationStatus as "verified" | "pending" | "rejected";
+    switch (status) {
       case "verified":
         return (
           <View style={styles.verificationBadge}>
@@ -417,7 +418,7 @@ export function GuideHome({ onNavigate }: GuideHomeProps) {
         <View style={styles.card}>
           <View style={styles.sectionTitleContainer}>
             <MaterialCommunityIcons
-              name="message-square"
+              name="message-text"
               size={20}
               color="#9333ea"
             />

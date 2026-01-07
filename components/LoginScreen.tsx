@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
+    ActivityIndicator,
     Alert,
     Image,
     Pressable,
@@ -11,6 +12,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { authAPI } from "../constants/api";
 
 interface LoginScreenProps {
   onLogin: (role: string) => void;
@@ -24,19 +26,38 @@ export function LoginScreen({
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = () => {
-    if (username && password) {
-      Alert.alert("Success", "Login successful!");
-      onLogin("tourist");
-    } else {
+  const handleLogin = async () => {
+    if (!username || !password) {
       Alert.alert("Error", "Please fill in all fields");
+      return;
     }
-  };
 
-  const handleGoogleLogin = () => {
-    Alert.alert("Success", "Google login successful!");
-    onLogin("tourist");
+    setIsLoading(true);
+    try {
+      // Call the backend API
+      const response = await authAPI.login({
+        email: username, // Using username as email
+        password: password,
+      });
+
+      // Success - show message and navigate
+      Alert.alert("Success", response.message || "Login successful!");
+      console.log("Login response:", response);
+      
+      // Navigate based on the role returned from backend
+      onLogin(response.user.role);
+    } catch (error: any) {
+      // Handle errors from backend
+      Alert.alert(
+        "Login Failed",
+        error.message || "Unable to login. Please try again."
+      );
+      console.error("Login error:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleForgotPassword = () => {
@@ -46,9 +67,12 @@ export function LoginScreen({
     );
   };
 
+  const handleGoogleLogin = () => {
+    Alert.alert("Google Login", "Google login functionality coming soon!");
+  };
+
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <View style={styles.logoContainer}>
@@ -64,7 +88,6 @@ export function LoginScreen({
         </View>
       </View>
 
-      {/* Login Form */}
       <View style={styles.formContainer}>
         <View style={styles.formCard}>
           <Text style={styles.title}>Login</Text>
@@ -72,7 +95,7 @@ export function LoginScreen({
             Enter your credentials to continue
           </Text>
 
-          {/* Username Input */}
+
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Username</Text>
             <View style={styles.inputWrapper}>
@@ -92,7 +115,6 @@ export function LoginScreen({
             </View>
           </View>
 
-          {/* Password Input */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Password</Text>
             <View style={styles.inputWrapper}>
@@ -123,28 +145,29 @@ export function LoginScreen({
             </View>
           </View>
 
-          {/* Forgot Password */}
           <TouchableOpacity onPress={handleForgotPassword}>
             <Text style={styles.forgotPasswordText}>Forgot password?</Text>
           </TouchableOpacity>
 
-          {/* Login Button */}
           <TouchableOpacity
-            style={styles.loginButton}
+            style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
             onPress={handleLogin}
             activeOpacity={0.8}
+            disabled={isLoading}
           >
-            <Text style={styles.loginButtonText}>Login</Text>
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.loginButtonText}>Login</Text>
+            )}
           </TouchableOpacity>
 
-          {/* Divider */}
           <View style={styles.dividerContainer}>
             <View style={styles.dividerLine} />
             <Text style={styles.dividerText}>Or continue with</Text>
             <View style={styles.dividerLine} />
           </View>
 
-          {/* Google Login */}
           <TouchableOpacity
             style={styles.googleButton}
             onPress={handleGoogleLogin}
@@ -157,7 +180,6 @@ export function LoginScreen({
             <Text style={styles.googleButtonText}>Continue with Google</Text>
           </TouchableOpacity>
 
-          {/* Register Link */}
           <View style={styles.registerContainer}>
             <Text style={styles.registerText}>Don't have an account? </Text>
             <TouchableOpacity onPress={onNavigateToRegister}>
@@ -275,6 +297,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 24,
   },
+  loginButtonDisabled: {
+    backgroundColor: "#9CA3AF",
+  },
   loginButtonText: {
     color: "#FFFFFF",
     fontSize: 16,
@@ -328,29 +353,6 @@ const styles = StyleSheet.create({
   },
   registerLink: {
     color: "#1B73E8",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  demoContainer: {
-    marginTop: 24,
-    gap: 12,
-  },
-  demoLabel: {
-    fontSize: 14,
-    color: "#9CA3AF",
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  demoButton: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-  },
-  demoButtonText: {
-    color: "#1F2937",
     fontSize: 14,
     fontWeight: "600",
   },
