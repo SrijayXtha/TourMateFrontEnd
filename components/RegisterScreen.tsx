@@ -2,15 +2,15 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import React, { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { authAPI } from "../constants/api";
 
@@ -265,7 +265,7 @@ export function RegisterScreen({
                 />
                 <TextInput
                   style={styles.input}
-                  placeholder="John Doe"
+                  placeholder="Enter your full name"
                   placeholderTextColor="#9CA3AF"
                   value={fullName}
                   onChangeText={setFullName}
@@ -284,7 +284,7 @@ export function RegisterScreen({
                 />
                 <TextInput
                   style={styles.input}
-                  placeholder="johndoe123"
+                  placeholder="Enter your username"
                   placeholderTextColor="#9CA3AF"
                   value={username}
                   onChangeText={setUsername}
@@ -303,7 +303,7 @@ export function RegisterScreen({
                 />
                 <TextInput
                   style={styles.input}
-                  placeholder="example@example.com"
+                  placeholder="Enter your email address"
                   placeholderTextColor="#9CA3AF"
                   value={email}
                   onChangeText={setEmail}
@@ -323,7 +323,7 @@ export function RegisterScreen({
                 />
                 <TextInput
                   style={styles.input}
-                  placeholder="+1 (555) 123-4567"
+                  placeholder="Enter your phone number"
                   placeholderTextColor="#9CA3AF"
                   value={phone}
                   onChangeText={setPhone}
@@ -346,7 +346,7 @@ export function RegisterScreen({
                 />
                 <TextInput
                   style={styles.input}
-                  placeholder="••••••••"
+                  placeholder="Enter your password"
                   placeholderTextColor="#9CA3AF"
                   value={password}
                   onChangeText={setPassword}
@@ -376,7 +376,7 @@ export function RegisterScreen({
                 />
                 <TextInput
                   style={styles.input}
-                  placeholder="••••••••"
+                  placeholder="Enter your Confirm Password"
                   placeholderTextColor="#9CA3AF"
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
@@ -414,7 +414,7 @@ export function RegisterScreen({
                   />
                   <TextInput
                     style={styles.input}
-                    placeholder="+1 (555) 987-6543"
+                    placeholder="Enter emergency contact number"
                     placeholderTextColor="#9CA3AF"
                     value={emergencyContact}
                     onChangeText={setEmergencyContact}
@@ -495,7 +495,7 @@ export function RegisterScreen({
                   />
                   <TextInput
                     style={styles.input}
-                    placeholder="e.g., Mountain trekking, Cultural tours"
+                    placeholder="Enter your specialization"
                     placeholderTextColor="#9CA3AF"
                     value={specialization}
                     onChangeText={setSpecialization}
@@ -578,7 +578,7 @@ export function RegisterScreen({
                   />
                   <TextInput
                     style={styles.input}
-                    placeholder="Grand Hotel & Resort"
+                    placeholder="Enter your business name"
                     placeholderTextColor="#9CA3AF"
                     value={businessName}
                     onChangeText={setBusinessName}
@@ -599,7 +599,7 @@ export function RegisterScreen({
                   />
                   <TextInput
                     style={styles.input}
-                    placeholder="BRN-123456789"
+                    placeholder="Enter your Business Registration Number"
                     placeholderTextColor="#9CA3AF"
                     value={registrationNumber}
                     onChangeText={setRegistrationNumber}
@@ -618,7 +618,7 @@ export function RegisterScreen({
                   />
                   <TextInput
                     style={[styles.input, styles.multilineInput]}
-                    placeholder="123 Main Street, City, State, ZIP"
+                    placeholder="Enter your hotel address"
                     placeholderTextColor="#9CA3AF"
                     value={hotelAddress}
                     onChangeText={setHotelAddress}
