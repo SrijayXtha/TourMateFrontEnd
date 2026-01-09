@@ -1,14 +1,14 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
-  Alert,
-  Image,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 const profileImage = require("../assets/images/profile.png");
@@ -157,7 +157,12 @@ export function TouristHome({ onNavigate }: TouristHomeProps) {
 
         {/* Connect With Top Guides */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Connect With Top Guides</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Connect With Top Guides</Text>
+            <TouchableOpacity onPress={() => onNavigate("explore-guides")}>
+              <Text style={styles.viewAllText}>View All</Text>
+            </TouchableOpacity>
+          </View>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -377,11 +382,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     marginBottom: 28,
   },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "700",
     color: "#1F2937",
-    marginBottom: 16,
+  },
+  viewAllText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1B73E8",
   },
   placesScroll: {
     marginHorizontal: -24,
