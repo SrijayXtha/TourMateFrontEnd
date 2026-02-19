@@ -10,7 +10,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import { mockGuides } from "../data/mockData";
+import { mockGuides } from "../../data/mockData";
 
 interface ExploreGuidesProps {
   onNavigate: (screen: string, data?: any) => void;
@@ -110,7 +110,7 @@ export function ExploreGuides({ onNavigate, onBack }: ExploreGuidesProps) {
             <View key={guide.id} style={styles.guideCard}>
               <View style={styles.guideCardContent}>
                 <Image
-                  source={{ uri: guide.photo }}
+                  source={typeof guide.photo === 'string' ? { uri: guide.photo } : guide.photo}
                   style={styles.guidePhoto}
                   resizeMode="cover"
                 />

@@ -12,7 +12,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import { authAPI } from "../constants/api";
+// import { authAPI } from "../../constants/api"; // TODO: Enable when backend is ready
 
 interface LoginScreenProps {
   onLogin: (role: string) => void;
@@ -35,6 +35,28 @@ export function LoginScreen({
     }
 
     setIsLoading(true);
+    
+    // Simulate a delay for loading state
+    setTimeout(() => {
+      setIsLoading(false);
+      
+      // Mock authentication - determine role based on username
+      let role = "tourist"; // Default role
+      
+      if (username.toLowerCase().includes("guide")) {
+        role = "guide";
+      } else if (username.toLowerCase().includes("hotel")) {
+        role = "hotel";
+      } else if (username.toLowerCase().includes("admin")) {
+        role = "admin";
+      }
+      
+      Alert.alert("Success", `Login successful as ${role}!`);
+      onLogin(role);
+    }, 1000);
+
+    // TODO: Enable this when backend is ready
+    /*
     try {
       // Call the backend API
       const response = await authAPI.login({
@@ -58,6 +80,7 @@ export function LoginScreen({
     } finally {
       setIsLoading(false);
     }
+    */
   };
 
   const handleForgotPassword = () => {
@@ -77,7 +100,7 @@ export function LoginScreen({
         <View style={styles.headerContent}>
           <View style={styles.logoContainer}>
             <Image
-              source={require("../assets/images/logo_white.png")}
+              source={require("../../assets/images/logo_white.png")}
               style={styles.logoImage}
             />
             <Text style={styles.logoText}>TourMate</Text>
@@ -174,7 +197,7 @@ export function LoginScreen({
             activeOpacity={0.8}
           >
             <Image
-              source={require("../assets/images/googlelogo.png")}
+              source={require("../../assets/images/googlelogo.png")}
               style={styles.googleLogoImage}
             />
             <Text style={styles.googleButtonText}>Continue with Google</Text>

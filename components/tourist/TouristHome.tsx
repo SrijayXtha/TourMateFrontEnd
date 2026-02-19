@@ -10,11 +10,12 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { mockDestinations, mockGuides } from "../../data/mockData";
 
-const profileImage = require("../assets/images/profile.png");
+const profileImage = require("../../assets/images/profile.png");
 
 interface TouristHomeProps {
-  onNavigate: (screen: string) => void;
+  onNavigate: (screen: string, data?: any) => void;
 }
 
 export function TouristHome({ onNavigate }: TouristHomeProps) {
@@ -51,37 +52,9 @@ export function TouristHome({ onNavigate }: TouristHomeProps) {
     },
   ];
 
-  const places = [
-    {
-      id: 1,
-      name: "Everest Base Camp",
-      category: "Trekking",
-      image: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxldmVyZXN0fGVufDB8fHx8fDE3NjM1MTc1MzB8MA&ixlib=rb-4.1.0&q=80&w=500",
-    },
-    {
-      id: 2,
-      name: "Pokhara",
-      category: "Lakeside",
-      image: require("../assets/images/pokhara.jpg"),
-    },
-  ];
-
-  const guides = [
-    {
-      id: 1,
-      name: "Ram Shah",
-      region: "Chitwan Region",
-      rating: 4.6,
-      image: profileImage,
-    },
-    {
-      id: 2,
-      name: "Pema Sherpa",
-      region: "Everest Region",
-      rating: 4.9,
-      image: profileImage,
-    },
-  ];
+  // Use first 5 destinations and guides from mock data
+  const places = mockDestinations.slice(0, 5);
+  const guides = mockGuides.slice(0, 5);
 
   const handleLearnMore = () => {
     Alert.alert("Featured Destination", "Swiss Alps Adventure", [
@@ -142,10 +115,15 @@ export function TouristHome({ onNavigate }: TouristHomeProps) {
             horizontal
             showsHorizontalScrollIndicator={false}
             style={styles.placesScroll}
+            contentContainerStyle={styles.scrollContent}
           >
             {places.map((place) => (
-              <TouchableOpacity key={place.id} style={styles.placeCard}>
-                <Image source={typeof place.image === 'string' ? { uri: place.image } : place.image} style={styles.placeImage} />
+              <TouchableOpacity 
+                key={place.id} 
+                style={styles.placeCard}
+                onPress={() => onNavigate("destination-details", place)}
+              >
+                <Image source={{ uri: place.image }} style={styles.placeImage} />
                 <View style={styles.placeInfo}>
                   <Text style={styles.placeName}>{place.name}</Text>
                   <Text style={styles.placeCategory}>{place.category}</Text>
@@ -158,7 +136,7 @@ export function TouristHome({ onNavigate }: TouristHomeProps) {
         {/* Connect With Top Guides */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Connect With Top Guides</Text>
+            <Text style={styles.sectionHeaderTitle}>Connect With Top Guides</Text>
             <TouchableOpacity onPress={() => onNavigate("explore-guides")}>
               <Text style={styles.viewAllText}>View All</Text>
             </TouchableOpacity>
@@ -167,16 +145,21 @@ export function TouristHome({ onNavigate }: TouristHomeProps) {
             horizontal
             showsHorizontalScrollIndicator={false}
             style={styles.guidesScroll}
+            contentContainerStyle={styles.scrollContent}
           >
             {guides.map((guide) => (
-              <TouchableOpacity key={guide.id} style={styles.guideCard}>
-                <Image source={guide.image} style={styles.guideAvatar} />
+              <TouchableOpacity 
+                key={guide.id} 
+                style={styles.guideCard}
+                onPress={() => onNavigate("guide-profile", guide)}
+              >
+                <Image source={typeof guide.photo === 'string' ? { uri: guide.photo } : guide.photo} style={styles.guideAvatar} />
                 <Text style={styles.guideName}>{guide.name}</Text>
                 <View style={styles.ratingContainer}>
                   <MaterialCommunityIcons name="star" size={16} color="#FCD34D" />
                   <Text style={styles.rating}>{guide.rating}</Text>
                 </View>
-                <Text style={styles.guideRegion}>{guide.region}</Text>
+                <Text style={styles.guideRegion}>{guide.location}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -235,7 +218,7 @@ export function TouristHome({ onNavigate }: TouristHomeProps) {
 
         <TouchableOpacity
           style={styles.navItem}
-          onPress={() => setActiveTab("explore")}
+          onPress={() => onNavigate("explore")}
         >
           <MaterialCommunityIcons
             name="compass"
@@ -273,7 +256,7 @@ export function TouristHome({ onNavigate }: TouristHomeProps) {
 
         <TouchableOpacity
           style={styles.navItem}
-          onPress={() => setActiveTab("profile")}
+          onPress={() => onNavigate("profile")}
         >
           <MaterialCommunityIcons
             name="account"
@@ -379,7 +362,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   section: {
-    paddingHorizontal: 24,
     marginBottom: 28,
   },
   sectionHeader: {
@@ -387,8 +369,16 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 16,
+    paddingHorizontal: 24,
   },
   sectionTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1F2937",
+    marginBottom: 16,
+    paddingHorizontal: 24,
+  },
+  sectionHeaderTitle: {
     fontSize: 18,
     fontWeight: "700",
     color: "#1F2937",
@@ -399,11 +389,14 @@ const styles = StyleSheet.create({
     color: "#1B73E8",
   },
   placesScroll: {
-    marginHorizontal: -24,
+    flexGrow: 0,
+  },
+  scrollContent: {
     paddingHorizontal: 24,
+    paddingRight: 24,
   },
   placeCard: {
-    marginRight: 12,
+    marginRight: 16,
     borderRadius: 16,
     overflow: "hidden",
     width: 180,
@@ -433,11 +426,10 @@ const styles = StyleSheet.create({
     color: "#9CA3AF",
   },
   guidesScroll: {
-    marginHorizontal: -24,
-    paddingHorizontal: 24,
+    flexGrow: 0,
   },
   guideCard: {
-    marginRight: 16,
+    marginRight: 20,
     alignItems: "center",
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
@@ -483,6 +475,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 12,
     marginBottom: 20,
+    paddingHorizontal: 24,
   },
   safetyCard: {
     width: "48%",

@@ -2,17 +2,17 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import React, { useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
-import { authAPI } from "../constants/api";
+// import { authAPI } from "../../constants/api"; // TODO: Enable when backend is ready
 
 interface RegisterScreenProps {
   onRegister: (role: string) => void;
@@ -61,9 +61,9 @@ export function RegisterScreen({
   const [isLoading, setIsLoading] = useState(false);
 
   const roles = [
-    { id: "tourist", label: "Tourist", image: require("../assets/images/tourist.png"), desc: "Explore and book tours" },
-    { id: "guide", label: "Guide", image: require("../assets/images/guide.png"), desc: "Offer tour services" },
-    { id: "hotel", label: "Hotel", image: require("../assets/images/hotel.png"), desc: "List accommodations" },
+    { id: "tourist", label: "Tourist", image: require("../../assets/images/tourist.png"), desc: "Explore and book tours" },
+    { id: "guide", label: "Guide", image: require("../../assets/images/guide.png"), desc: "Offer tour services" },
+    { id: "hotel", label: "Hotel", image: require("../../assets/images/hotel.png"), desc: "List accommodations" },
   ];
 
   const preferences = [
@@ -129,6 +129,29 @@ export function RegisterScreen({
     }
 
     setIsLoading(true);
+    
+    // Simulate a delay for loading state
+    setTimeout(() => {
+      setIsLoading(false);
+      
+      // Mock registration - success message based on role
+      let message = "Account created successfully!";
+      if (selectedRole === "guide") {
+        message = "Guide account created! Pending admin verification.";
+      } else if (selectedRole === "hotel") {
+        message = "Hotel account created! Pending admin verification.";
+      }
+      
+      Alert.alert("Success", message, [
+        { 
+          text: "OK", 
+          onPress: () => onRegister(selectedRole) 
+        }
+      ]);
+    }, 1000);
+
+    // TODO: Enable this when backend is ready
+    /*
     try {
       // Call the backend API
       const response = await authAPI.register({
@@ -164,6 +187,7 @@ export function RegisterScreen({
     } finally {
       setIsLoading(false);
     }
+    */
   };
 
   const handleFileUpload = async (type: "guide" | "hotel") => {
@@ -205,7 +229,7 @@ export function RegisterScreen({
         <View style={styles.headerContent}>
           <View style={styles.logoContainer}>
             <Image
-              source={require("../assets/images/logo_white.png")}
+              source={require("../../assets/images/logo_white.png")}
               style={styles.logoImage}
             />
             <Text style={styles.logoText}>TourMate</Text>
