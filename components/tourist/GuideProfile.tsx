@@ -35,11 +35,13 @@ interface Guide {
 interface GuideProfileProps {
   guide: Guide;
   onBack: () => void;
-  onBook: (date: string) => void;
+  onBook: (startDate: string, endDate: string) => void;
 }
 
 export function GuideProfile({ guide, onBack, onBook }: GuideProfileProps) {
-  const [selectedDate, setSelectedDate] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [activeDateField, setActiveDateField] = useState<'start' | 'end'>('start');
 
   const handleMessageGuide = () => {
     Alert.alert(
@@ -50,16 +52,27 @@ export function GuideProfile({ guide, onBack, onBook }: GuideProfileProps) {
   };
 
   const handleBookNow = () => {
-    if (!selectedDate) {
-      Alert.alert('Select a Date', 'Please select an available date to continue booking.');
+    if (!startDate || !endDate) {
+      Alert.alert('Select Booking Dates', 'Please select both start and end dates to continue booking.');
       return;
     }
-    onBook(selectedDate);
+
+    if (new Date(endDate) < new Date(startDate)) {
+      Alert.alert('Invalid Date Range', 'End date must be the same as or after the start date.');
+      return;
+    }
+
+    onBook(startDate, endDate);
   };
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  const formatInputDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US');
   };
 
   return (
@@ -157,28 +170,42 @@ export function GuideProfile({ guide, onBack, onBook }: GuideProfileProps) {
           <View style={styles.card}>
             <View style={styles.availabilityHeader}>
               <MaterialCommunityIcons name="calendar" size={20} color="#1B73E8" />
-              <Text style={styles.cardTitle}>Available Dates</Text>
+              <Text style={styles.cardTitle}>Select Booking Dates</Text>
             </View>
-            <View style={styles.datesGrid}>
-              {guide.availability.map((date) => (
-                <TouchableOpacity
-                  key={date}
-                  onPress={() => setSelectedDate(date)}
-                  style={[
-                    styles.dateButton,
-                    selectedDate === date && styles.dateButtonSelected,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.dateButtonText,
-                      selectedDate === date && styles.dateButtonTextSelected,
-                    ]}
-                  >
-                    {formatDate(date)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+
+            <Text style={styles.dateLabel}>Start Date</Text>
+            <TouchableOpacity
+              onPress={() => setActiveDateField('start')}
+              style={[
+                styles.dateInput,
+                activeDateField === 'start' && styles.dateInputActive,
+              ]}
+            >
+              <Text style={[styles.dateInputText, !startDate && styles.dateInputPlaceholder]}>
+                {startDate ? formatInputDate(startDate) : 'mm/dd/yyyy'}
+              </Text>
+              <MaterialCommunityIcons name="calendar-month-outline" size={20} color="#111827" />
+            </TouchableOpacity>
+
+            <Text style={styles.dateLabel}>End Date</Text>
+            <TouchableOpacity
+              onPress={() => setActiveDateField('end')}
+              style={[
+                styles.dateInput,
+                activeDateField === 'end' && styles.dateInputActive,
+              ]}
+            >
+              <Text style={[styles.dateInputText, !endDate && styles.dateInputPlaceholder]}>
+                {endDate ? formatInputDate(endDate) : 'mm/dd/yyyy'}
+              </Text>
+              <MaterialCommunityIcons name="calendar-month-outline" size={20} color="#111827" />
+            </TouchableOpacity>
+
+            <View style={styles.availableDatesInfo}>
+              <MaterialCommunityIcons name="calendar-blank-outline" size={14} color="#1B73E8" />
+              <Text style={styles.availableDatesText}>
+                Available dates: {guide.availability.map(formatDate).join(', ')}
+              </Text>
             </View>
           </View>
         )}
@@ -227,10 +254,10 @@ export function GuideProfile({ guide, onBack, onBook }: GuideProfileProps) {
         <TouchableOpacity
           style={[
             styles.bookButton,
-            !selectedDate && styles.bookButtonDisabled,
+            (!startDate || !endDate) && styles.bookButtonDisabled,
           ]}
           onPress={handleBookNow}
-          disabled={!selectedDate}
+          disabled={!startDate || !endDate}
         >
           <Text style={styles.bookButtonText}>Book Now</Text>
         </TouchableOpacity>
@@ -414,33 +441,49 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 16,
+    marginBottom: 12,
   },
-  datesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+  dateLabel: {
+    fontSize: 14,
+    color: '#374151',
+    marginBottom: 8,
   },
-  dateButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+  dateInput: {
+    height: 52,
     borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#E0E0E0',
-    minWidth: 100,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    paddingHorizontal: 14,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+    backgroundColor: '#fff',
   },
-  dateButtonSelected: {
+  dateInputActive: {
     borderColor: '#1B73E8',
-    backgroundColor: 'rgba(27, 115, 232, 0.05)',
   },
-  dateButtonText: {
+  dateInputText: {
+    fontSize: 16,
+    color: '#111827',
+  },
+  dateInputPlaceholder: {
+    color: '#9CA3AF',
+  },
+  availableDatesInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(27, 115, 232, 0.08)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  availableDatesText: {
+    flex: 1,
     fontSize: 13,
-    color: '#333',
-  },
-  dateButtonTextSelected: {
     color: '#1B73E8',
-    fontWeight: '600',
   },
   reviewsList: {
     gap: 16,

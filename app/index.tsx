@@ -155,8 +155,8 @@ export default function Index() {
         <GuideProfile
           guide={selectedGuide}
           onBack={() => setTouristScreen(previousScreen)}
-          onBook={(date) => {
-            console.log("Booking guide for:", date);
+          onBook={(startDate, endDate) => {
+            console.log("Booking guide from:", startDate, "to:", endDate);
             // TODO: Handle booking logic
           }}
         />

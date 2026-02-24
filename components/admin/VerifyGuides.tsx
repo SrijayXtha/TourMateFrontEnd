@@ -1,13 +1,13 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
-    Alert,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { mockGuides } from "../../data/mockData";
 
@@ -101,7 +101,7 @@ export function VerifyGuides({ onBack }: VerifyGuidesProps) {
                 {/* Guide Header */}
                 <View style={styles.guideHeader}>
                   <Image
-                    source={{ uri: guide.photo }}
+                    source={{ uri: String(guide.photo) }}
                     style={styles.guidePhoto}
                   />
                   <View style={styles.guideInfo}>
@@ -220,7 +220,7 @@ export function VerifyGuides({ onBack }: VerifyGuidesProps) {
                 {/* Guide Header */}
                 <View style={styles.guideHeader}>
                   <Image
-                    source={{ uri: guide.photo }}
+                    source={{ uri: String(guide.photo) }}
                     style={styles.guidePhoto}
                   />
                   <View style={styles.guideInfo}>

@@ -8,6 +8,7 @@ import {
     View,
 } from 'react-native';
 import { ExploreDestinationsTab } from './ExploreDestinationsTab';
+import { ExploreGuidesTab } from './ExploreGuidesTab';
 import { ExploreHotelsTab } from './ExploreHotelsTab';
 
 interface ExploreProps {
@@ -16,7 +17,7 @@ interface ExploreProps {
 }
 
 export function Explore({ onNavigate, onBack }: ExploreProps) {
-  const [activeTab, setActiveTab] = useState<'destinations' | 'hotels'>('destinations');
+  const [activeTab, setActiveTab] = useState<'destinations' | 'guides' | 'hotels'>('destinations');
 
   return (
     <View style={styles.container}>
@@ -33,7 +34,7 @@ export function Explore({ onNavigate, onBack }: ExploreProps) {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Explore</Text>
         <Text style={styles.headerSubtitle}>
-          Discover amazing destinations and hotels
+          Discover amazing destinations, guides and hotels
         </Text>
       </LinearGradient>
 
@@ -64,6 +65,28 @@ export function Explore({ onNavigate, onBack }: ExploreProps) {
         <TouchableOpacity
           style={[
             styles.tab,
+            activeTab === 'guides' && styles.activeTab,
+          ]}
+          onPress={() => setActiveTab('guides')}
+        >
+          <MaterialCommunityIcons
+            name="account-group"
+            size={20}
+            color={activeTab === 'guides' ? '#1B73E8' : '#6B7280'}
+          />
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'guides' && styles.activeTabText,
+            ]}
+          >
+            Guides
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.tab,
             activeTab === 'hotels' && styles.activeTab,
           ]}
           onPress={() => setActiveTab('hotels')}
@@ -87,6 +110,8 @@ export function Explore({ onNavigate, onBack }: ExploreProps) {
       {/* Tab Content */}
       {activeTab === 'destinations' ? (
         <ExploreDestinationsTab onNavigate={onNavigate} />
+      ) : activeTab === 'guides' ? (
+        <ExploreGuidesTab onNavigate={onNavigate} />
       ) : (
         <ExploreHotelsTab onNavigate={onNavigate} />
       )}
