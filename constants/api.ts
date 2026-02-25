@@ -32,6 +32,11 @@ export const authAPI = {
     const response = await api.post('/auth/login', credentials);
     return response.data;
   },
+
+  googleLogin: async (payload: { idToken: string; role?: string }) => {
+    const response = await api.post('/auth/google', payload);
+    return response.data;
+  },
 };
 
 // Response interceptor for error handling

@@ -1,9 +1,13 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import { makeRedirectUri, ResponseType } from "expo-auth-session";
+import * as Google from "expo-auth-session/providers/google";
+import * as WebBrowser from "expo-web-browser";
+import React, { useEffect, useRef, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
     Image,
+  Platform,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -12,7 +16,18 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-// import { authAPI } from "../../constants/api"; // TODO: Enable when backend is ready
+import { authAPI } from "../../constants/api";
+import { GOOGLE_WEB_CLIENT_ID } from "../../constants/googleAuth";
+
+if (Platform.OS !== "web") {
+  WebBrowser.maybeCompleteAuthSession();
+}
+
+const GOOGLE_REDIRECT_URI = makeRedirectUri({
+  scheme: "tourmate",
+  path: "oauthredirect",
+  preferLocalhost: true,
+});
 
 interface LoginScreenProps {
   onLogin: (role: string) => void;
@@ -27,6 +42,70 @@ export function LoginScreen({
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const processedGoogleTokenRef = useRef<string | null>(null);
+
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    webClientId: GOOGLE_WEB_CLIENT_ID,
+    iosClientId: GOOGLE_WEB_CLIENT_ID,
+    androidClientId: GOOGLE_WEB_CLIENT_ID,
+    redirectUri: GOOGLE_REDIRECT_URI,
+    responseType: ResponseType.IdToken,
+    scopes: ["openid", "profile", "email"],
+  });
+
+  useEffect(() => {
+    const processGoogleLogin = async () => {
+      if (response?.type === "error") {
+        setIsLoading(false);
+        Alert.alert(
+          "Google OAuth Configuration Error",
+          `Google Console मा यो Redirect URI add गर्नुहोस्:\n${GOOGLE_REDIRECT_URI}`
+        );
+        return;
+      }
+
+      if (response?.type !== "success") {
+        return;
+      }
+
+      const responseIdToken = response.authentication?.idToken;
+      const paramsIdToken = response.params?.id_token;
+      const idToken =
+        responseIdToken || (typeof paramsIdToken === "string" ? paramsIdToken : undefined);
+
+      if (!idToken) {
+        setIsLoading(false);
+        Alert.alert("Google Login Failed", "Google did not return an ID token.");
+        return;
+      }
+
+      if (processedGoogleTokenRef.current === idToken) {
+        setIsLoading(false);
+        return;
+      }
+
+      processedGoogleTokenRef.current = idToken;
+
+      try {
+        const apiResponse = await authAPI.googleLogin({
+          idToken,
+          role: "tourist",
+        });
+
+        Alert.alert("Success", apiResponse.message || "Google login successful");
+        onLogin(apiResponse.user.role);
+      } catch (error: any) {
+        Alert.alert(
+          "Google Login Failed",
+          error.message || "Unable to sign in with Google. Please try again."
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    processGoogleLogin();
+  }, [onLogin, response]);
 
   const handleLogin = async () => {
     if (!username || !password) {
@@ -90,8 +169,25 @@ export function LoginScreen({
     );
   };
 
-  const handleGoogleLogin = () => {
-    Alert.alert("Google Login", "Google login functionality coming soon!");
+  const handleGoogleLogin = async () => {
+    if (isLoading) {
+      return;
+    }
+
+    if (!request) {
+      Alert.alert("Google Login", "Google sign-in is still initializing. Try again.");
+      return;
+    }
+
+    setIsLoading(true);
+    const result = await promptAsync();
+
+    if (result.type !== "success") {
+      setIsLoading(false);
+      if (result.type === "error") {
+        Alert.alert("Google Login Failed", "Could not complete Google sign-in.");
+      }
+    }
   };
 
   return (
@@ -192,9 +288,10 @@ export function LoginScreen({
           </View>
 
           <TouchableOpacity
-            style={styles.googleButton}
+            style={[styles.googleButton, (isLoading || !request) && styles.googleButtonDisabled]}
             onPress={handleGoogleLogin}
             activeOpacity={0.8}
+            disabled={isLoading || !request}
           >
             <Image
               source={require("../../assets/images/googlelogo.png")}
@@ -204,7 +301,7 @@ export function LoginScreen({
           </TouchableOpacity>
 
           <View style={styles.registerContainer}>
-            <Text style={styles.registerText}>Don't have an account? </Text>
+            <Text style={styles.registerText}>Don&apos;t have an account? </Text>
             <TouchableOpacity onPress={onNavigateToRegister}>
               <Text style={styles.registerLink}>Register</Text>
             </TouchableOpacity>
@@ -353,6 +450,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 24,
     backgroundColor: "#FFFFFF",
+  },
+  googleButtonDisabled: {
+    opacity: 0.6,
   },
   googleLogoImage: {
     width: 20,
