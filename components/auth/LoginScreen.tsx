@@ -2,12 +2,11 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { makeRedirectUri, ResponseType } from "expo-auth-session";
 import * as Google from "expo-auth-session/providers/google";
 import * as WebBrowser from "expo-web-browser";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
     Image,
-    Platform,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -19,15 +18,16 @@ import {
 import { authAPI } from "../../constants/api";
 import { GOOGLE_WEB_CLIENT_ID } from "../../constants/googleAuth";
 
-if (Platform.OS !== "web") {
-  WebBrowser.maybeCompleteAuthSession();
-}
+WebBrowser.maybeCompleteAuthSession();
 
-const GOOGLE_REDIRECT_URI = makeRedirectUri({
-  scheme: "tourmate",
-  path: "oauthredirect",
-  preferLocalhost: true,
-});
+const GOOGLE_REDIRECT_URI =
+  typeof window !== "undefined" && window.location?.origin
+    ? `${window.location.origin}/oauthredirect`
+    : makeRedirectUri({
+        scheme: "tourmate",
+        path: "oauthredirect",
+        preferLocalhost: true,
+      });
 
 interface LoginScreenProps {
   onLogin: (role: string) => void;
@@ -42,10 +42,10 @@ export function LoginScreen({
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const processedGoogleTokenRef = useRef<string | null>(null);
 
   const [request, response, promptAsync] = Google.useAuthRequest({
     webClientId: GOOGLE_WEB_CLIENT_ID,
+    expoClientId: GOOGLE_WEB_CLIENT_ID,
     iosClientId: GOOGLE_WEB_CLIENT_ID,
     androidClientId: GOOGLE_WEB_CLIENT_ID,
     redirectUri: GOOGLE_REDIRECT_URI,
@@ -79,13 +79,6 @@ export function LoginScreen({
         return;
       }
 
-      if (processedGoogleTokenRef.current === idToken) {
-        setIsLoading(false);
-        return;
-      }
-
-      processedGoogleTokenRef.current = idToken;
-
       try {
         const apiResponse = await authAPI.googleLogin({
           idToken,
@@ -114,32 +107,11 @@ export function LoginScreen({
     }
 
     setIsLoading(true);
-    
-    // Simulate a delay for loading state
-    setTimeout(() => {
-      setIsLoading(false);
-      
-      // Mock authentication - determine role based on username
-      let role = "tourist"; // Default role
-      
-      if (username.toLowerCase().includes("guide")) {
-        role = "guide";
-      } else if (username.toLowerCase().includes("hotel")) {
-        role = "hotel";
-      } else if (username.toLowerCase().includes("admin")) {
-        role = "admin";
-      }
-      
-      Alert.alert("Success", `Login successful as ${role}!`);
-      onLogin(role);
-    }, 1000);
 
-    // TODO: Enable this when backend is ready
-    /*
     try {
       // Call the backend API
       const response = await authAPI.login({
-        email: username, // Using username as email
+        email: username,
         password: password,
       });
 
@@ -148,7 +120,9 @@ export function LoginScreen({
       console.log("Login response:", response);
       
       // Navigate based on the role returned from backend
-      onLogin(response.user.role);
+      if (response.data && response.data.user) {
+        onLogin(response.data.user.role);
+      }
     } catch (error: any) {
       // Handle errors from backend
       Alert.alert(
@@ -159,7 +133,6 @@ export function LoginScreen({
     } finally {
       setIsLoading(false);
     }
-    */
   };
 
   const handleForgotPassword = () => {
@@ -170,10 +143,6 @@ export function LoginScreen({
   };
 
   const handleGoogleLogin = async () => {
-    if (isLoading) {
-      return;
-    }
-
     if (!request) {
       Alert.alert("Google Login", "Google sign-in is still initializing. Try again.");
       return;

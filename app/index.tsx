@@ -295,7 +295,7 @@ if (touristScreen === "explore-hotels") {
           console.log("Navigating to:", screen);
           if (screen === "verify-guides") {
             setAdminScreen("verify-guides");
-          }ens
+          }
           console.log("Navigating to:", screen);
         }}
       />

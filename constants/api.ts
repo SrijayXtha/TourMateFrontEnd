@@ -18,7 +18,7 @@ export const api = axios.create({
 // Auth API endpoints
 export const authAPI = {
   register: async (userData: {
-    full_name: string;
+    fullName: string;
     email: string;
     password: string;
     phone?: string;

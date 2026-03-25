@@ -2,17 +2,17 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import React, { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
-// import { authAPI } from "../../constants/api"; // TODO: Enable when backend is ready
+import { authAPI } from "../../constants/api";
 
 interface RegisterScreenProps {
   onRegister: (role: string) => void;
@@ -92,75 +92,56 @@ export function RegisterScreen({
   };
 
   const handleRegister = async () => {
+    console.log("🔷 handleRegister called");
+
     // Validate common fields
-    if (!fullName || !username || !email || !password || !confirmPassword || !phone) {
+    if (!fullName || !email || !password || !confirmPassword || !phone) {
+      console.log("❌ Validation failed: Missing required fields");
       Alert.alert("Error", "Please fill in all required fields");
       return;
     }
 
     if (password !== confirmPassword) {
+      console.log("❌ Validation failed: Passwords do not match");
       Alert.alert("Error", "Passwords do not match");
       return;
     }
 
     if (password.length < 6) {
+      console.log("❌ Validation failed: Password too short");
       Alert.alert("Error", "Password must be at least 6 characters");
       return;
     }
 
-    // Role-specific validation
-    if (selectedRole === "tourist" && !emergencyContact) {
-      Alert.alert("Error", "Please provide an emergency contact number");
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      console.log("❌ Validation failed: Invalid email format");
+      Alert.alert("Error", "Please enter a valid email address");
       return;
     }
 
-    if (selectedRole === "guide") {
-      if (!guideLicense || !specialization || !experienceYears) {
-        Alert.alert("Error", "Please complete all guide credentials");
-        return;
-      }
-    }
-
-    if (selectedRole === "hotel") {
-      if (!businessName || !registrationNumber || !hotelAddress || !hotelLicense) {
-        Alert.alert("Error", "Please complete all hotel business details");
-        return;
-      }
-    }
-
+    console.log("✅ All validations passed, starting API call...");
     setIsLoading(true);
-    
-    // Simulate a delay for loading state
-    setTimeout(() => {
-      setIsLoading(false);
-      
-      // Mock registration - success message based on role
-      let message = "Account created successfully!";
-      if (selectedRole === "guide") {
-        message = "Guide account created! Pending admin verification.";
-      } else if (selectedRole === "hotel") {
-        message = "Hotel account created! Pending admin verification.";
-      }
-      
-      Alert.alert("Success", message, [
-        { 
-          text: "OK", 
-          onPress: () => onRegister(selectedRole) 
-        }
-      ]);
-    }, 1000);
 
-    // TODO: Enable this when backend is ready
-    /*
     try {
+      console.log("📤 Calling authAPI.register with:", {
+        fullName,
+        email,
+        phone,
+        role: selectedRole,
+      });
+
       // Call the backend API
       const response = await authAPI.register({
-        full_name: fullName,
+        fullName: fullName,
         email: email,
         password: password,
         phone: phone,
         role: selectedRole,
       });
+
+      console.log("✅ API Response received:", response);
 
       // Success message based on role
       let message = response.message || "Account created successfully!";
@@ -169,25 +150,39 @@ export function RegisterScreen({
       } else if (selectedRole === "hotel") {
         message = "Hotel account created! Pending admin verification.";
       }
+
+      console.log("🎉 Showing success alert:", message);
       
       Alert.alert("Success", message, [
         { 
           text: "OK", 
-          onPress: () => onRegister(selectedRole) 
+          onPress: () => {
+            console.log("✅ User clicked OK - navigating to login");
+            // Navigate to login screen instead of directly logging in
+            onNavigateToLogin();
+          }
         }
       ]);
-      console.log("Registration response:", response);
     } catch (error: any) {
       // Handle errors from backend
+      console.error("❌ Registration error:", {
+        message: error?.message,
+        status: error?.status,
+        fullError: error,
+      });
+
+      const errorMessage = error?.message || "Unable to register. Please try again.";
+      console.log("⚠️ Showing error alert:", errorMessage);
+      
       Alert.alert(
         "Registration Failed",
-        error.message || "Unable to register. Please try again."
+        errorMessage,
+        [{ text: "OK", onPress: () => console.log("User dismissed error") }]
       );
-      console.error("Registration error:", error);
     } finally {
       setIsLoading(false);
+      console.log("🔄 Loading finished");
     }
-    */
   };
 
   const handleFileUpload = async (type: "guide" | "hotel") => {
