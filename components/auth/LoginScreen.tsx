@@ -7,7 +7,7 @@ import {
     ActivityIndicator,
     Alert,
     Image,
-  Platform,
+    Platform,
     Pressable,
     ScrollView,
     StyleSheet,
