@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+    Alert,
     Animated,
     ScrollView,
     StyleSheet,
@@ -11,12 +12,44 @@ import {
 
 interface SOSScreenProps {
   onBack: () => void;
+  onSendSOS: (payload: { location: string; description?: string }) => Promise<void> | void;
 }
 
-export function SOSScreen({ onBack }: SOSScreenProps) {
+export function SOSScreen({ onBack, onSendSOS }: SOSScreenProps) {
   const [sosActivated, setSosActivated] = useState(false);
   const [countdown, setCountdown] = useState(3);
+  const [isSending, setIsSending] = useState(false);
   const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  const resetSOSState = useCallback(() => {
+    setSosActivated(false);
+    setCountdown(3);
+    pulseAnim.setValue(1);
+  }, [pulseAnim]);
+
+  const submitSOS = useCallback(async () => {
+    if (isSending) {
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      await onSendSOS({
+        location: "46.5197°N, 6.6323°E",
+        description: "SOS triggered from TourMate mobile app",
+      });
+
+      Alert.alert("SOS Sent", "Emergency alert has been sent successfully.");
+    } catch (error: any) {
+      Alert.alert(
+        "SOS Failed",
+        error?.message || "Unable to send emergency alert. Please try again."
+      );
+    } finally {
+      setIsSending(false);
+      resetSOSState();
+    }
+  }, [isSending, onSendSOS, resetSOSState]);
 
   useEffect(() => {
     if (sosActivated) {
@@ -43,13 +76,13 @@ export function SOSScreen({ onBack }: SOSScreenProps) {
         setCountdown(count);
         if (count === 0) {
           clearInterval(interval);
-          // SOS would be sent here
+          void submitSOS();
         }
       }, 1000);
 
       return () => clearInterval(interval);
     }
-  }, [sosActivated, pulseAnim]);
+  }, [sosActivated, pulseAnim, submitSOS]);
 
   const handleSOSPress = () => {
     if (!sosActivated) {
@@ -58,9 +91,7 @@ export function SOSScreen({ onBack }: SOSScreenProps) {
   };
 
   const handleCancel = () => {
-    setSosActivated(false);
-    setCountdown(3);
-    pulseAnim.setValue(1);
+    resetSOSState();
   };
 
   return (
@@ -88,7 +119,9 @@ export function SOSScreen({ onBack }: SOSScreenProps) {
               />
               <Text style={styles.cardTitle}>Emergency Assistance</Text>
               <Text style={styles.cardDescription}>
-                {sosActivated
+                {isSending
+                  ? 'Sending emergency alert...'
+                  : sosActivated
                   ? `Sending SOS in ${countdown}...`
                   : "Press and hold the button below to send an emergency alert"}
               </Text>
@@ -99,6 +132,7 @@ export function SOSScreen({ onBack }: SOSScreenProps) {
                 onPress={handleSOSPress}
                 style={styles.sosButton}
                 activeOpacity={0.8}
+                disabled={isSending}
               >
                 <MaterialCommunityIcons
                   name="alert-circle"
@@ -121,6 +155,7 @@ export function SOSScreen({ onBack }: SOSScreenProps) {
                 <TouchableOpacity
                   onPress={handleCancel}
                   style={styles.cancelButton}
+                  disabled={isSending}
                 >
                   <Text style={styles.cancelButtonText}>Cancel</Text>
                 </TouchableOpacity>

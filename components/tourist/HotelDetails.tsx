@@ -26,12 +26,14 @@ interface Hotel {
 interface HotelDetailsProps {
   hotel: Hotel;
   onBack: () => void;
+  onBook?: (startDate: string, endDate: string) => Promise<void> | void;
   onNavigate?: (screen: string, data?: any) => void;
 }
 
-export function HotelDetails({ hotel, onBack, onNavigate }: HotelDetailsProps) {
+export function HotelDetails({ hotel, onBack, onBook }: HotelDetailsProps) {
   const [checkInDate, setCheckInDate] = useState('');
   const [checkOutDate, setCheckOutDate] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Generate available dates for the next 30 days
   const generateAvailableDates = () => {
@@ -71,7 +73,22 @@ export function HotelDetails({ hotel, onBack, onNavigate }: HotelDetailsProps) {
         {
           text: 'Book Now',
           onPress: () => {
-            Alert.alert('Success', 'Booking request submitted!');
+            if (!onBook) {
+              Alert.alert('Success', 'Booking request submitted!');
+              return;
+            }
+
+            setIsSubmitting(true);
+            Promise.resolve(onBook(checkInDate, checkOutDate))
+              .catch((error: any) => {
+                Alert.alert(
+                  'Booking Failed',
+                  error?.message || 'Unable to create booking request. Please try again.'
+                );
+              })
+              .finally(() => {
+                setIsSubmitting(false);
+              });
           },
         },
       ]
@@ -265,12 +282,14 @@ export function HotelDetails({ hotel, onBack, onNavigate }: HotelDetailsProps) {
         <TouchableOpacity
           style={[
             styles.bookButton,
-            (!checkInDate || !checkOutDate) && styles.bookButtonDisabled,
+            (!checkInDate || !checkOutDate || isSubmitting) && styles.bookButtonDisabled,
           ]}
           onPress={handleBookRoom}
-          disabled={!checkInDate || !checkOutDate}
+          disabled={!checkInDate || !checkOutDate || isSubmitting}
         >
-          <Text style={styles.bookButtonText}>Book Now</Text>
+          <Text style={styles.bookButtonText}>
+            {isSubmitting ? 'Submitting...' : 'Book Now'}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>

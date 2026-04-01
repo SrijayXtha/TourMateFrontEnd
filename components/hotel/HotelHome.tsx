@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
     Alert,
     ScrollView,
@@ -8,33 +8,349 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { hotelAPI } from "../../constants/api";
 
 interface HotelHomeProps {
   onNavigate: (screen: string) => void;
 }
 
+interface HotelBookingCard {
+  id: number;
+  name: string;
+  checkIn: string;
+  checkOut: string;
+  guests: number;
+  roomType: string;
+  price: string;
+  status?: string;
+}
+
+interface HotelCancelRequestCard {
+  id: number;
+  name: string;
+  checkIn: string;
+  roomType: string;
+  requestedOn: string;
+}
+
+interface HotelNotificationCard {
+  id: number;
+  message: string;
+  time: string;
+  type: string;
+  unread: boolean;
+}
+
+const formatDate = (value?: string | null) => {
+  if (!value) {
+    return "TBD";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "TBD";
+  }
+
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+};
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) {
+    return "Just now";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Just now";
+  }
+
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+};
+
+const formatCurrency = (value?: number | string | null) => {
+  const parsed = Number(value || 0);
+  if (!Number.isFinite(parsed)) {
+    return "Rs 0";
+  }
+
+  return `Rs ${parsed.toLocaleString()}`;
+};
+
 export function HotelHome({ onNavigate }: HotelHomeProps) {
+  const [hotelName, setHotelName] = useState("Grand Paradise Resort");
+  const [hotelLocation, setHotelLocation] = useState("Miami Beach, Florida");
   const [roomsAvailable, setRoomsAvailable] = useState(12);
-  const totalRooms = 25;
+  const [totalRooms, setTotalRooms] = useState(25);
+  const [verificationStatus, setVerificationStatus] = useState<
+    "verified" | "pending" | "rejected"
+  >("verified");
+  const [stats, setStats] = useState({
+    totalReviews: 342,
+    averageRating: 4.8,
+    confirmedRevenue: 18340,
+    pendingRevenue: 890,
+  });
+  const [bookingRequests, setBookingRequests] = useState<HotelBookingCard[]>([
+    {
+      id: 1,
+      name: "Emily Davis",
+      checkIn: "Jan 5",
+      checkOut: "Jan 8",
+      guests: 2,
+      roomType: "Deluxe Suite",
+      price: "Rs 450",
+    },
+    {
+      id: 2,
+      name: "Robert Brown",
+      checkIn: "Jan 7",
+      checkOut: "Jan 10",
+      guests: 4,
+      roomType: "Family Room",
+      price: "Rs 680",
+    },
+  ]);
+  const [confirmedBookings, setConfirmedBookings] = useState<HotelBookingCard[]>([
+    {
+      id: 101,
+      name: "Sarah Johnson",
+      checkIn: "Dec 29",
+      checkOut: "Dec 31",
+      guests: 2,
+      roomType: "Standard Room",
+      price: "Rs 0",
+      status: "Confirmed",
+    },
+    {
+      id: 102,
+      name: "Mike Chen",
+      checkIn: "Jan 2",
+      checkOut: "Jan 5",
+      guests: 3,
+      roomType: "Deluxe Suite",
+      price: "Rs 0",
+      status: "Confirmed",
+    },
+    {
+      id: 103,
+      name: "Anna Wilson",
+      checkIn: "Jan 4",
+      checkOut: "Jan 7",
+      guests: 2,
+      roomType: "Ocean View",
+      price: "Rs 0",
+      status: "Confirmed",
+    },
+  ]);
+  const [cancelRequests, setCancelRequests] = useState<HotelCancelRequestCard[]>([
+    {
+      id: 1,
+      name: "John Smith",
+      checkIn: "Jan 3",
+      roomType: "Standard Room",
+      requestedOn: "2 hours ago",
+    },
+  ]);
+  const [notifications, setNotifications] = useState<HotelNotificationCard[]>([
+    {
+      id: 1,
+      message: "New booking request from Emily Davis",
+      time: "5 min ago",
+      type: "booking",
+      unread: true,
+    },
+    {
+      id: 2,
+      message: "John Smith requested cancellation",
+      time: "2 hours ago",
+      type: "cancel",
+      unread: true,
+    },
+    {
+      id: 3,
+      message: "Payment received for booking #1247",
+      time: "5 hours ago",
+      type: "payment",
+      unread: false,
+    },
+  ]);
 
-  // Mock verification status: "verified", "pending", "rejected"
-  const verificationStatus = "verified";
+  const occupancyRate =
+    totalRooms > 0
+      ? Math.max(0, Math.min(100, Math.round(((totalRooms - roomsAvailable) / totalRooms) * 100)))
+      : 0;
 
-  const handleAcceptBooking = (name: string) => {
-    Alert.alert("Success", `Booking request from ${name} accepted!`);
+  const loadHotelDashboard = useCallback(async () => {
+    try {
+      const [dashboardResponse, bookingsResponse, notificationsResponse, profileResponse] =
+        await Promise.all([
+          hotelAPI.getDashboard(),
+          hotelAPI.getBookings({ page: 1, limit: 50 }),
+          hotelAPI.getNotifications(1, 10),
+          hotelAPI.getProfile(),
+        ]);
+
+      const dashboard = dashboardResponse?.data || {};
+      const dashboardStats = dashboard?.stats || {};
+      const bookings = (bookingsResponse?.data?.bookings || []) as any[];
+      const notificationsList = (notificationsResponse?.data?.notifications || []) as any[];
+      const profileHotel = profileResponse?.data?.hotel || {};
+      const dashboardHotel = dashboard?.hotel || {};
+
+      setRoomsAvailable(Number(dashboardStats.roomsAvailable || 0));
+      setTotalRooms(Number(dashboardStats.totalRooms || 0));
+      setStats({
+        totalReviews: Number(dashboardStats.totalReviews || 0),
+        averageRating: Number(dashboardStats.averageRating || 0),
+        confirmedRevenue: Number(dashboardStats.confirmedRevenue || 0),
+        pendingRevenue: Number(dashboardStats.pendingRevenue || 0),
+      });
+
+      const resolvedHotelName = profileHotel.hotelName || dashboardHotel.hotel_name;
+      if (resolvedHotelName) {
+        setHotelName(String(resolvedHotelName));
+      }
+
+      const resolvedLocation = profileHotel.location || dashboardHotel.location;
+      if (resolvedLocation) {
+        setHotelLocation(String(resolvedLocation));
+      }
+
+      const isVerified = profileHotel.verifiedStatus;
+      if (isVerified === true) {
+        setVerificationStatus("verified");
+      } else if (isVerified === false) {
+        setVerificationStatus("pending");
+      }
+
+      const pending = bookings
+        .filter((booking) => String(booking.status || "").toLowerCase() === "pending")
+        .slice(0, 3)
+        .map((booking) => ({
+          id: Number(booking.id || 0),
+          name: booking.touristName || "Tourist",
+          checkIn: formatDate(booking.checkIn),
+          checkOut: formatDate(booking.checkOut),
+          guests: 1,
+          roomType: "Room Booking",
+          price: formatCurrency(booking.totalPrice),
+        }));
+      setBookingRequests(pending);
+
+      const confirmed = bookings
+        .filter((booking) => String(booking.status || "").toLowerCase() === "confirmed")
+        .slice(0, 5)
+        .map((booking) => ({
+          id: Number(booking.id || 0),
+          name: booking.touristName || "Tourist",
+          checkIn: formatDate(booking.checkIn),
+          checkOut: formatDate(booking.checkOut),
+          guests: 1,
+          roomType: "Room Booking",
+          price: formatCurrency(booking.totalPrice),
+          status: "Confirmed",
+        }));
+      setConfirmedBookings(confirmed);
+
+      const pendingCancellation = bookings
+        .filter(
+          (booking) => String(booking.status || "").toLowerCase() === "pending_cancellation"
+        )
+        .slice(0, 5)
+        .map((booking) => ({
+          id: Number(booking.id || 0),
+          name: booking.touristName || "Tourist",
+          checkIn: formatDate(booking.checkIn),
+          roomType: "Room Booking",
+          requestedOn: "Pending",
+        }));
+      setCancelRequests(pendingCancellation);
+
+      if (notificationsList.length > 0) {
+        setNotifications(
+          notificationsList.map((notification) => ({
+            id: Number(notification.notification_id || 0),
+            message: notification.message || "Notification",
+            time: formatDateTime(notification.created_at),
+            type: notification.type || "general",
+            unread: !Boolean(notification.is_read),
+          }))
+        );
+      } else {
+        setNotifications([]);
+      }
+    } catch (error: any) {
+      console.warn("Failed to load hotel dashboard:", error?.message || error);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadHotelDashboard();
+  }, [loadHotelDashboard]);
+
+  const handleAcceptBooking = async (bookingId: number, name: string) => {
+    try {
+      await hotelAPI.acceptBooking(bookingId);
+      Alert.alert("Success", `Booking request from ${name} accepted!`);
+      await loadHotelDashboard();
+    } catch (error: any) {
+      Alert.alert(
+        "Action Failed",
+        error?.message || `Unable to accept booking request from ${name}.`
+      );
+    }
   };
 
-  const handleRejectBooking = (name: string) => {
-    Alert.alert("Rejected", `Booking request from ${name} rejected`);
+  const handleRejectBooking = async (bookingId: number, name: string) => {
+    try {
+      await hotelAPI.rejectBooking(bookingId);
+      Alert.alert("Rejected", `Booking request from ${name} rejected`);
+      await loadHotelDashboard();
+    } catch (error: any) {
+      Alert.alert(
+        "Action Failed",
+        error?.message || `Unable to reject booking request from ${name}.`
+      );
+    }
   };
 
-  const handleCancelRequest = (name: string) => {
-    Alert.alert("Info", `Processing cancellation request from ${name}`);
+  const processCancelRequest = async (bookingId: number, approve: boolean) => {
+    try {
+      await hotelAPI.handleCancelRequest(bookingId, approve);
+      await loadHotelDashboard();
+    } catch (error: any) {
+      Alert.alert(
+        "Action Failed",
+        error?.message || "Unable to process cancellation request."
+      );
+    }
+  };
+
+  const handleCancelRequest = (bookingId: number, name: string) => {
+    Alert.alert("Cancellation Request", `Process cancellation request from ${name}?`, [
+      {
+        text: "Decline",
+        onPress: () => void processCancelRequest(bookingId, false),
+      },
+      {
+        text: "Approve",
+        style: "destructive",
+        onPress: () => void processCancelRequest(bookingId, true),
+      },
+      { text: "Close", style: "cancel" },
+    ]);
   };
 
   const getVerificationBadge = () => {
-    const status = verificationStatus as "verified" | "pending" | "rejected";
-    switch (status) {
+    switch (verificationStatus) {
       case "verified":
         return (
           <View style={styles.verificationBadge}>
@@ -86,27 +402,6 @@ export function HotelHome({ onNavigate }: HotelHomeProps) {
     }
   };
 
-  const bookingRequests = [
-    { id: 1, name: "Emily Davis", checkIn: "Jan 5", checkOut: "Jan 8", guests: 2, roomType: "Deluxe Suite", price: "$450" },
-    { id: 2, name: "Robert Brown", checkIn: "Jan 7", checkOut: "Jan 10", guests: 4, roomType: "Family Room", price: "$680" },
-  ];
-
-  const confirmedBookings = [
-    { name: "Sarah Johnson", checkIn: "Dec 29", checkOut: "Dec 31", guests: 2, roomType: "Standard Room", status: "Confirmed" },
-    { name: "Mike Chen", checkIn: "Jan 2", checkOut: "Jan 5", guests: 3, roomType: "Deluxe Suite", status: "Confirmed" },
-    { name: "Anna Wilson", checkIn: "Jan 4", checkOut: "Jan 7", guests: 2, roomType: "Ocean View", status: "Confirmed" }
-  ];
-
-  const cancelRequests = [
-    { id: 1, name: "John Smith", checkIn: "Jan 3", roomType: "Standard Room", requestedOn: "2 hours ago" },
-  ];
-
-  const notifications = [
-    { id: 1, message: "New booking request from Emily Davis", time: "5 min ago", type: "booking", unread: true },
-    { id: 2, message: "John Smith requested cancellation", time: "2 hours ago", type: "cancel", unread: true },
-    { id: 3, message: "Payment received for booking #1247", time: "5 hours ago", type: "payment", unread: false },
-  ];
-
   const facilities = [
     { icon: "wifi", label: "Free WiFi" },
     { icon: "coffee", label: "Restaurant" },
@@ -126,10 +421,10 @@ export function HotelHome({ onNavigate }: HotelHomeProps) {
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <View>
-            <Text style={styles.hotelName}>Grand Paradise Resort</Text>
+            <Text style={styles.hotelName}>{hotelName}</Text>
             <View style={styles.locationContainer}>
               <MaterialCommunityIcons name="map-marker" size={16} color="#fff" />
-              <Text style={styles.locationText}>Miami Beach, Florida</Text>
+              <Text style={styles.locationText}>{hotelLocation}</Text>
             </View>
           </View>
           <TouchableOpacity
@@ -183,7 +478,7 @@ export function HotelHome({ onNavigate }: HotelHomeProps) {
             <View style={styles.roomStatRow}>
               <Text style={styles.roomStatLabel}>Occupancy Rate</Text>
               <Text style={styles.roomStatValueBlue}>
-                {Math.round(((totalRooms - roomsAvailable) / totalRooms) * 100)}%
+                {occupancyRate}%
               </Text>
             </View>
             <View style={styles.progressBarContainer}>
@@ -192,7 +487,7 @@ export function HotelHome({ onNavigate }: HotelHomeProps) {
                   style={[
                     styles.progressBarFill,
                     {
-                      width: `${((totalRooms - roomsAvailable) / totalRooms) * 100}%`,
+                      width: `${occupancyRate}%`,
                     },
                   ]}
                 />
@@ -254,7 +549,7 @@ export function HotelHome({ onNavigate }: HotelHomeProps) {
                   <View style={styles.bookingRequestActions}>
                     <TouchableOpacity
                       style={styles.acceptButton}
-                      onPress={() => handleAcceptBooking(request.name)}
+                      onPress={() => void handleAcceptBooking(request.id, request.name)}
                     >
                       <MaterialCommunityIcons
                         name="check-circle"
@@ -265,7 +560,7 @@ export function HotelHome({ onNavigate }: HotelHomeProps) {
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.declineButton}
-                      onPress={() => handleRejectBooking(request.name)}
+                      onPress={() => void handleRejectBooking(request.id, request.name)}
                     >
                       <MaterialCommunityIcons
                         name="close-circle"
@@ -315,7 +610,7 @@ export function HotelHome({ onNavigate }: HotelHomeProps) {
                   </View>
                   <TouchableOpacity
                     style={styles.processCancelButton}
-                    onPress={() => handleCancelRequest(request.name)}
+                    onPress={() => handleCancelRequest(request.id, request.name)}
                   >
                     <Text style={styles.processCancelButtonText}>
                       Process Cancellation
@@ -399,18 +694,18 @@ export function HotelHome({ onNavigate }: HotelHomeProps) {
 
           <View style={styles.ratingContainer}>
             <View style={styles.ratingOverview}>
-              <Text style={styles.ratingScore}>4.8</Text>
+              <Text style={styles.ratingScore}>{Number(stats.averageRating || 0).toFixed(1)}</Text>
               <View style={styles.starsContainer}>
                 {[1, 2, 3, 4, 5].map((star) => (
                   <MaterialCommunityIcons
                     key={star}
-                    name="star"
+                    name={star <= Math.round(Number(stats.averageRating || 0)) ? "star" : "star-outline"}
                     size={16}
                     color="#FACC15"
                   />
                 ))}
               </View>
-              <Text style={styles.ratingCount}>342 reviews</Text>
+              <Text style={styles.ratingCount}>{stats.totalReviews} reviews</Text>
             </View>
 
             <View style={styles.ratingBreakdown}>
@@ -532,7 +827,7 @@ export function HotelHome({ onNavigate }: HotelHomeProps) {
 
           <TouchableOpacity
             style={styles.viewAllButton}
-            onPress={() => Alert.alert("Info", "Opening all notifications")}
+            onPress={() => onNavigate("hotel-notifications")}
           >
             <Text style={styles.viewAllButtonText}>View All Notifications</Text>
           </TouchableOpacity>
@@ -599,16 +894,18 @@ export function HotelHome({ onNavigate }: HotelHomeProps) {
 
           <View style={styles.revenueGrid}>
             <View style={[styles.revenueCard, styles.revenueCardGreen]}>
-              <Text style={styles.revenueLabel}>Today</Text>
-              <Text style={styles.revenueValue}>$890</Text>
+              <Text style={styles.revenueLabel}>Pending</Text>
+              <Text style={styles.revenueValue}>{formatCurrency(stats.pendingRevenue)}</Text>
             </View>
             <View style={[styles.revenueCard, styles.revenueCardBlue]}>
-              <Text style={styles.revenueLabel}>This Week</Text>
-              <Text style={styles.revenueValueBlue}>$4,250</Text>
+              <Text style={styles.revenueLabel}>Confirmed</Text>
+              <Text style={styles.revenueValueBlue}>{formatCurrency(stats.confirmedRevenue)}</Text>
             </View>
             <View style={[styles.revenueCard, styles.revenueCardTeal]}>
-              <Text style={styles.revenueLabel}>This Month</Text>
-              <Text style={styles.revenueValueTeal}>$18,340</Text>
+              <Text style={styles.revenueLabel}>Total</Text>
+              <Text style={styles.revenueValueTeal}>
+                {formatCurrency(stats.confirmedRevenue + stats.pendingRevenue)}
+              </Text>
             </View>
           </View>
 

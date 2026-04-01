@@ -1,7 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
-    Alert,
     Image,
     ScrollView,
     StyleSheet,
@@ -11,8 +10,6 @@ import {
     View,
 } from "react-native";
 import { mockDestinations, mockGuides } from "../../data/mockData";
-
-const profileImage = require("../../assets/images/profile.png");
 
 interface TouristHomeProps {
   onNavigate: (screen: string, data?: any) => void;
@@ -55,21 +52,6 @@ export function TouristHome({ onNavigate }: TouristHomeProps) {
   // Use first 5 destinations and guides from mock data
   const places = mockDestinations.slice(0, 5);
   const guides = mockGuides.slice(0, 5);
-
-  const handleLearnMore = () => {
-    Alert.alert("Featured Destination", "Swiss Alps Adventure", [
-      {
-        text: "Learn More",
-        onPress: () => {
-          Alert.alert(
-            "Swiss Alps",
-            "Experience breathtaking mountain views and adventure like never before!"
-          );
-        },
-      },
-      { text: "Close" },
-    ]);
-  };
 
   return (
     <View style={styles.container}>

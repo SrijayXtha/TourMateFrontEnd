@@ -45,7 +45,6 @@ export function LoginScreen({
 
   const [request, response, promptAsync] = Google.useAuthRequest({
     webClientId: GOOGLE_WEB_CLIENT_ID,
-    expoClientId: GOOGLE_WEB_CLIENT_ID,
     iosClientId: GOOGLE_WEB_CLIENT_ID,
     androidClientId: GOOGLE_WEB_CLIENT_ID,
     redirectUri: GOOGLE_REDIRECT_URI,
@@ -117,7 +116,6 @@ export function LoginScreen({
 
       // Success - show message and navigate
       Alert.alert("Success", response.message || "Login successful!");
-      console.log("Login response:", response);
       
       // Navigate based on the role returned from backend
       if (response.data && response.data.user) {
@@ -129,7 +127,7 @@ export function LoginScreen({
         "Login Failed",
         error.message || "Unable to login. Please try again."
       );
-      console.error("Login error:", error);
+      console.warn("Login warning:", error?.message || error);
     } finally {
       setIsLoading(false);
     }

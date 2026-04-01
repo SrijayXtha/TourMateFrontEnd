@@ -75,6 +75,36 @@ export function GuideProfile({ guide, onBack, onBook }: GuideProfileProps) {
     return date.toLocaleDateString('en-US');
   };
 
+  const handleSelectDate = (field: 'start' | 'end') => {
+    const dates = (guide.availability || []).slice(0, 12);
+
+    if (dates.length === 0) {
+      Alert.alert('No Dates Available', 'This guide has no available dates right now.');
+      return;
+    }
+
+    const buttons = [
+      ...dates.map((date) => ({
+        text: formatDate(date),
+        onPress: () => {
+          setActiveDateField(field);
+          if (field === 'start') {
+            setStartDate(date);
+          } else {
+            setEndDate(date);
+          }
+        },
+      })),
+      { text: 'Cancel', style: 'cancel' as const },
+    ];
+
+    Alert.alert(
+      field === 'start' ? 'Select Start Date' : 'Select End Date',
+      'Choose an available date',
+      buttons
+    );
+  };
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -175,7 +205,7 @@ export function GuideProfile({ guide, onBack, onBook }: GuideProfileProps) {
 
             <Text style={styles.dateLabel}>Start Date</Text>
             <TouchableOpacity
-              onPress={() => setActiveDateField('start')}
+              onPress={() => handleSelectDate('start')}
               style={[
                 styles.dateInput,
                 activeDateField === 'start' && styles.dateInputActive,
@@ -189,7 +219,7 @@ export function GuideProfile({ guide, onBack, onBook }: GuideProfileProps) {
 
             <Text style={styles.dateLabel}>End Date</Text>
             <TouchableOpacity
-              onPress={() => setActiveDateField('end')}
+              onPress={() => handleSelectDate('end')}
               style={[
                 styles.dateInput,
                 activeDateField === 'end' && styles.dateInputActive,

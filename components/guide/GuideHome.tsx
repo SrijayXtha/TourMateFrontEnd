@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
     Alert,
     ScrollView,
@@ -9,38 +9,246 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { guideAPI } from "../../constants/api";
 
 interface GuideHomeProps {
   onNavigate: (screen: string) => void;
 }
 
+interface GuideRequestCard {
+  id: number;
+  name: string;
+  date: string;
+  type: string;
+  price: string;
+}
+
+interface GuideUpcomingCard {
+  name: string;
+  date: string;
+  time: string;
+  type: string;
+  status: string;
+}
+
+const formatDate = (value?: string | null) => {
+  if (!value) {
+    return "TBD";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "TBD";
+  }
+
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+};
+
+const formatCurrency = (value?: number | string | null) => {
+  const parsed = Number(value || 0);
+  if (!Number.isFinite(parsed)) {
+    return "Rs 0";
+  }
+
+  return `Rs ${parsed.toLocaleString()}`;
+};
+
 export function GuideHome({ onNavigate }: GuideHomeProps) {
   const [isAvailable, setIsAvailable] = useState(true);
+  const [guideFirstName, setGuideFirstName] = useState("John");
+  const [guideRoleLabel, setGuideRoleLabel] = useState("Mountain Guide Expert");
+  const [verificationStatus, setVerificationStatus] = useState<
+    "verified" | "pending" | "rejected"
+  >("verified");
+  const [stats, setStats] = useState({
+    pendingRequests: 0,
+    confirmedBookings: 0,
+    totalBookings: 0,
+    totalReviews: 156,
+    averageRating: 4.9,
+    confirmedRevenue: 12850,
+    pendingRevenue: 340,
+  });
+  const [bookingRequests, setBookingRequests] = useState<GuideRequestCard[]>([
+    {
+      id: 1,
+      name: "Alex Rodriguez",
+      date: "Dec 30",
+      type: "Mountain Trek",
+      price: "Rs 150",
+    },
+    {
+      id: 2,
+      name: "Maria Garcia",
+      date: "Dec 31",
+      type: "Cultural Tour",
+      price: "Rs 120",
+    },
+  ]);
+  const [upcomingJobs, setUpcomingJobs] = useState<GuideUpcomingCard[]>([
+    {
+      name: "Sarah Johnson",
+      date: "Dec 28",
+      time: "09:00 AM",
+      type: "Mountain Trek",
+      status: "Confirmed",
+    },
+    {
+      name: "Mike Chen",
+      date: "Dec 29",
+      time: "02:00 PM",
+      type: "City Tour",
+      status: "Confirmed",
+    },
+    {
+      name: "Emma Wilson",
+      date: "Jan 2",
+      time: "10:00 AM",
+      type: "Wildlife Safari",
+      status: "Confirmed",
+    },
+  ]);
 
-  // Mock verification status: "verified", "pending", "rejected"
-  const verificationStatus = "verified";
+  const loadGuideDashboard = useCallback(async () => {
+    try {
+      const [dashboardResponse, profileResponse, upcomingResponse] = await Promise.all([
+        guideAPI.getDashboard(),
+        guideAPI.getProfile(),
+        guideAPI.getUpcomingTours(),
+      ]);
 
-  const handleAvailabilityToggle = (checked: boolean) => {
+      const dashboard = dashboardResponse?.data || {};
+      const dashboardStats = dashboard?.stats || {};
+      const dashboardGuide = dashboard?.guide || {};
+      const pendingBookings = (dashboard?.pendingBookings || []) as any[];
+      const profileData = profileResponse?.data || {};
+      const profileGuide = profileData?.guide || {};
+      const tours = (upcomingResponse?.data?.tours || []) as any[];
+
+      setStats({
+        pendingRequests: Number(dashboardStats.pendingRequests || 0),
+        confirmedBookings: Number(dashboardStats.confirmedBookings || 0),
+        totalBookings: Number(dashboardStats.totalBookings || 0),
+        totalReviews: Number(dashboardStats.totalReviews || 0),
+        averageRating: Number(dashboardStats.averageRating || 0),
+        confirmedRevenue: Number(dashboardStats.confirmedRevenue || 0),
+        pendingRevenue: Number(dashboardStats.pendingRevenue || 0),
+      });
+
+      const fullName = String(profileData.full_name || "").trim();
+      if (fullName) {
+        setGuideFirstName(fullName.split(" ")[0] || fullName);
+      }
+
+      const experienceYears = Number(
+        profileGuide.experienceYears ?? dashboardGuide.experience_years ?? 0
+      );
+      if (experienceYears > 0) {
+        setGuideRoleLabel(`${experienceYears}+ years experience`);
+      }
+
+      const isVerified =
+        profileGuide.verifiedStatus ?? dashboardGuide.verified_status ?? null;
+      if (isVerified === true) {
+        setVerificationStatus("verified");
+      } else if (isVerified === false) {
+        setVerificationStatus("pending");
+      }
+
+      const availableValue =
+        profileGuide.isAvailable ?? dashboardGuide.is_available ?? null;
+      if (typeof availableValue === "boolean") {
+        setIsAvailable(availableValue);
+      }
+
+      if (pendingBookings.length > 0) {
+        setBookingRequests(
+          pendingBookings.slice(0, 3).map((booking) => ({
+            id: Number(booking.id || booking.bookingId || 0),
+            name: booking.touristName || "Tourist",
+            date: formatDate(booking.startDate),
+            type: "Tour Request",
+            price: formatCurrency(booking.totalPrice),
+          }))
+        );
+      } else {
+        setBookingRequests([]);
+      }
+
+      if (tours.length > 0) {
+        setUpcomingJobs(
+          tours.slice(0, 5).map((tour) => ({
+            name: tour.touristName || "Tourist",
+            date: formatDate(tour.startDate),
+            time: formatDate(tour.endDate),
+            type: "Upcoming Tour",
+            status: "Confirmed",
+          }))
+        );
+      } else {
+        setUpcomingJobs([]);
+      }
+    } catch (error: any) {
+      console.warn("Failed to load guide dashboard:", error?.message || error);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadGuideDashboard();
+  }, [loadGuideDashboard]);
+
+  const handleAvailabilityToggle = async (checked: boolean) => {
+    const previousValue = isAvailable;
     setIsAvailable(checked);
-    Alert.alert(
-      "Status Updated",
-      checked
-        ? "You are now available for bookings"
-        : "You are now unavailable for bookings"
-    );
+
+    try {
+      await guideAPI.updateAvailability(checked);
+      Alert.alert(
+        "Status Updated",
+        checked
+          ? "You are now available for bookings"
+          : "You are now unavailable for bookings"
+      );
+    } catch (error: any) {
+      setIsAvailable(previousValue);
+      Alert.alert(
+        "Update Failed",
+        error?.message || "Unable to update availability right now."
+      );
+    }
   };
 
-  const handleAcceptBooking = (name: string) => {
-    Alert.alert("Success", `Booking request from ${name} accepted!`);
+  const handleAcceptBooking = async (bookingId: number, name: string) => {
+    try {
+      await guideAPI.acceptBooking(bookingId);
+      Alert.alert("Success", `Booking request from ${name} accepted!`);
+      await loadGuideDashboard();
+    } catch (error: any) {
+      Alert.alert(
+        "Action Failed",
+        error?.message || `Unable to accept booking request from ${name}.`
+      );
+    }
   };
 
-  const handleRejectBooking = (name: string) => {
-    Alert.alert("Rejected", `Booking request from ${name} rejected`);
+  const handleRejectBooking = async (bookingId: number, name: string) => {
+    try {
+      await guideAPI.rejectBooking(bookingId);
+      Alert.alert("Rejected", `Booking request from ${name} rejected`);
+      await loadGuideDashboard();
+    } catch (error: any) {
+      Alert.alert(
+        "Action Failed",
+        error?.message || `Unable to reject booking request from ${name}.`
+      );
+    }
   };
 
   const getVerificationBadge = () => {
-    const status = verificationStatus as "verified" | "pending" | "rejected";
-    switch (status) {
+    switch (verificationStatus) {
       case "verified":
         return (
           <View style={styles.verificationBadge}>
@@ -100,49 +308,6 @@ export function GuideHome({ onNavigate }: GuideHomeProps) {
     }
   };
 
-  const bookingRequests = [
-    {
-      id: 1,
-      name: "Alex Rodriguez",
-      date: "Dec 30",
-      time: "10:00 AM",
-      type: "Mountain Trek",
-      price: "$150",
-    },
-    {
-      id: 2,
-      name: "Maria Garcia",
-      date: "Dec 31",
-      time: "02:00 PM",
-      type: "Cultural Tour",
-      price: "$120",
-    },
-  ];
-
-  const upcomingJobs = [
-    {
-      name: "Sarah Johnson",
-      date: "Dec 28",
-      time: "09:00 AM",
-      type: "Mountain Trek",
-      status: "Confirmed",
-    },
-    {
-      name: "Mike Chen",
-      date: "Dec 29",
-      time: "02:00 PM",
-      type: "City Tour",
-      status: "Confirmed",
-    },
-    {
-      name: "Emma Wilson",
-      date: "Jan 2",
-      time: "10:00 AM",
-      type: "Wildlife Safari",
-      status: "Confirmed",
-    },
-  ];
-
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header with Profile Preview */}
@@ -157,8 +322,8 @@ export function GuideHome({ onNavigate }: GuideHomeProps) {
               />
             </View>
             <View style={styles.profileText}>
-              <Text style={styles.profileGreeting}>Welcome back, John!</Text>
-              <Text style={styles.profileRole}>Mountain Guide Expert</Text>
+              <Text style={styles.profileGreeting}>Welcome back, {guideFirstName}!</Text>
+              <Text style={styles.profileRole}>{guideRoleLabel}</Text>
             </View>
           </View>
           <TouchableOpacity
@@ -253,7 +418,7 @@ export function GuideHome({ onNavigate }: GuideHomeProps) {
                 <View style={styles.buttonRow}>
                   <TouchableOpacity
                     style={[styles.button, styles.acceptButton]}
-                    onPress={() => handleAcceptBooking(request.name)}
+                    onPress={() => void handleAcceptBooking(request.id, request.name)}
                   >
                     <MaterialCommunityIcons
                       name="check-circle"
@@ -264,7 +429,7 @@ export function GuideHome({ onNavigate }: GuideHomeProps) {
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.button, styles.rejectButton]}
-                    onPress={() => handleRejectBooking(request.name)}
+                    onPress={() => void handleRejectBooking(request.id, request.name)}
                   >
                     <MaterialCommunityIcons
                       name="close-circle"
@@ -291,27 +456,29 @@ export function GuideHome({ onNavigate }: GuideHomeProps) {
           </View>
           <View style={styles.earningsGrid}>
             <View style={[styles.earningsCard, styles.earningsCardGreen]}>
-              <Text style={styles.earningsLabel}>Today</Text>
+              <Text style={styles.earningsLabel}>Pending</Text>
               <Text style={[styles.earningsAmount, styles.earningsAmountGreen]}>
-                $340
+                {formatCurrency(stats.pendingRevenue)}
               </Text>
             </View>
             <View style={[styles.earningsCard, styles.earningsCardBlue]}>
-              <Text style={styles.earningsLabel}>This Week</Text>
+              <Text style={styles.earningsLabel}>Confirmed</Text>
               <Text style={[styles.earningsAmount, styles.earningsAmountBlue]}>
-                $890
+                {formatCurrency(stats.confirmedRevenue)}
               </Text>
             </View>
             <View style={[styles.earningsCard, styles.earningsCardTeal]}>
-              <Text style={styles.earningsLabel}>This Month</Text>
+              <Text style={styles.earningsLabel}>Bookings</Text>
               <Text style={[styles.earningsAmount, styles.earningsAmountTeal]}>
-                $2,400
+                {stats.totalBookings}
               </Text>
             </View>
           </View>
           <View style={styles.totalEarningsSection}>
             <Text style={styles.totalEarningsLabel}>Total Earnings</Text>
-            <Text style={styles.totalEarningsAmount}>$12,850</Text>
+            <Text style={styles.totalEarningsAmount}>
+              {formatCurrency(stats.confirmedRevenue + stats.pendingRevenue)}
+            </Text>
           </View>
         </View>
 
@@ -334,18 +501,18 @@ export function GuideHome({ onNavigate }: GuideHomeProps) {
           </View>
           <View style={styles.ratingSection}>
             <View style={styles.ratingScore}>
-              <Text style={styles.ratingNumber}>4.9</Text>
+              <Text style={styles.ratingNumber}>{Number(stats.averageRating || 0).toFixed(1)}</Text>
               <View style={styles.starsContainer}>
                 {[1, 2, 3, 4, 5].map((star) => (
                   <MaterialCommunityIcons
                     key={star}
-                    name="star"
+                    name={star <= Math.round(Number(stats.averageRating || 0)) ? "star" : "star-outline"}
                     size={16}
                     color="#fbbf24"
                   />
                 ))}
               </View>
-              <Text style={styles.reviewCount}>156 reviews</Text>
+              <Text style={styles.reviewCount}>{stats.totalReviews} reviews</Text>
             </View>
             <View style={styles.ratingBreakdown}>
               {[
@@ -388,30 +555,34 @@ export function GuideHome({ onNavigate }: GuideHomeProps) {
             </View>
           </View>
           <View style={styles.spacer} />
-          {upcomingJobs.map((booking, index) => (
-            <View key={index} style={styles.upcomingJob}>
-              <View style={styles.jobInfo}>
-                <View style={styles.userAvatar}>
-                  <MaterialCommunityIcons
-                    name="account-multiple"
-                    size={20}
-                    color="#FFFFFF"
-                  />
+          {upcomingJobs.length > 0 ? (
+            upcomingJobs.map((booking, index) => (
+              <View key={index} style={styles.upcomingJob}>
+                <View style={styles.jobInfo}>
+                  <View style={styles.userAvatar}>
+                    <MaterialCommunityIcons
+                      name="account-multiple"
+                      size={20}
+                      color="#FFFFFF"
+                    />
+                  </View>
+                  <View>
+                    <Text style={styles.userName}>{booking.name}</Text>
+                    <Text style={styles.tourType}>{booking.type}</Text>
+                  </View>
                 </View>
-                <View>
-                  <Text style={styles.userName}>{booking.name}</Text>
-                  <Text style={styles.tourType}>{booking.type}</Text>
+                <View style={styles.jobTimeInfo}>
+                  <Text style={styles.jobDate}>{booking.date}</Text>
+                  <Text style={styles.jobTime}>{booking.time}</Text>
+                  <View style={styles.statusBadge}>
+                    <Text style={styles.statusText}>{booking.status}</Text>
+                  </View>
                 </View>
               </View>
-              <View style={styles.jobTimeInfo}>
-                <Text style={styles.jobDate}>{booking.date}</Text>
-                <Text style={styles.jobTime}>{booking.time}</Text>
-                <View style={styles.statusBadge}>
-                  <Text style={styles.statusText}>{booking.status}</Text>
-                </View>
-              </View>
-            </View>
-          ))}
+            ))
+          ) : (
+            <Text style={styles.emptyHint}>No upcoming tours right now.</Text>
+          )}
         </View>
 
         {/* Messages */}
@@ -442,9 +613,7 @@ export function GuideHome({ onNavigate }: GuideHomeProps) {
               <TouchableOpacity
                 key={index}
                 style={styles.messageItem}
-                onPress={() =>
-                  Alert.alert("Chat", `Opening chat with ${chat.name}`)
-                }
+                onPress={() => onNavigate("guide-messages")}
               >
                 <View>
                   <View style={styles.messageHeader}>
@@ -459,7 +628,7 @@ export function GuideHome({ onNavigate }: GuideHomeProps) {
           </View>
           <TouchableOpacity
             style={styles.viewAllButton}
-            onPress={() => Alert.alert("Messages", "Opening all messages")}
+            onPress={() => onNavigate("guide-messages")}
           >
             <Text style={styles.viewAllButtonText}>View All Messages</Text>
           </TouchableOpacity>
@@ -705,6 +874,10 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: "#e5e7eb",
     marginBottom: 12,
+  },
+  emptyHint: {
+    fontSize: 13,
+    color: "#6b7280",
   },
   bookingRequest: {
     borderWidth: 1,

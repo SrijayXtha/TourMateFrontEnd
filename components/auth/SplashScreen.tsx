@@ -37,7 +37,7 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
     // Auto-navigate after 2 seconds
     const timer = setTimeout(onComplete, 2000);
     return () => clearTimeout(timer);
-  }, [onComplete]);
+  }, [bounceValue, onComplete]);
 
   const translateY = bounceValue.interpolate({
     inputRange: [0, 1],

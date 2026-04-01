@@ -12,22 +12,33 @@ import {
 interface TouristProfileProps {
   onLogout: () => void;
   onBack: () => void;
+  onNavigate?: (screen: string) => void;
 }
 
-export function TouristProfile({ onLogout, onBack }: TouristProfileProps) {
+export function TouristProfile({ onLogout, onBack, onNavigate }: TouristProfileProps) {
   const menuItems = [
-    { icon: "cog", label: "Account Settings", color: "#6B7280" },
-    { icon: "bell", label: "Notifications", color: "#6B7280" },
-    { icon: "credit-card", label: "Payment Methods", color: "#6B7280" },
-    { icon: "heart", label: "Saved Places", color: "#6B7280" },
-    { icon: "shield-check", label: "Privacy & Security", color: "#6B7280" },
+    { icon: "cog", label: "Account Settings", color: "#6B7280", screen: "settings" },
+    { icon: "bell", label: "Notifications", color: "#6B7280", screen: "notifications" },
+    { icon: "credit-card", label: "Payment Methods", color: "#6B7280", screen: "settings" },
+    { icon: "heart", label: "Saved Places", color: "#6B7280", screen: "settings" },
+    { icon: "shield-check", label: "Privacy & Security", color: "#6B7280", screen: "settings" },
   ];
 
-  const handleMenuClick = (label: string) => {
+  const handleMenuClick = (label: string, screen: string) => {
+    if (onNavigate) {
+      onNavigate(screen);
+      return;
+    }
+
     Alert.alert("Info", `Opening ${label}...`);
   };
 
   const handleEditProfile = () => {
+    if (onNavigate) {
+      onNavigate("settings");
+      return;
+    }
+
     Alert.alert("Info", "Opening profile editor...");
   };
 
@@ -131,7 +142,7 @@ export function TouristProfile({ onLogout, onBack }: TouristProfileProps) {
           <TouchableOpacity
             key={item.label}
             style={styles.menuItem}
-            onPress={() => handleMenuClick(item.label)}
+            onPress={() => handleMenuClick(item.label, item.screen)}
           >
             <View style={styles.menuItemLeft}>
               <MaterialCommunityIcons

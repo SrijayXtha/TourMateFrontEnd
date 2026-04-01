@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
     ScrollView,
     StyleSheet,
@@ -7,17 +7,19 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { adminAPI } from "../../constants/api";
 
-// Mock data
-const mockAnalytics = {
-  totalUsers: 1247,
-  userGrowth: 12.5,
-  totalBookings: 845,
-  bookingGrowth: 18.3,
-  totalGuides: 156,
-  totalHotels: 89,
-  pendingVerifications: 12,
-  activeIncidents: 3,
+const parseGrowthNumber = (value: unknown): number => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number.parseFloat(value.replace(/[^0-9.-]/g, ""));
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  return 0;
 };
 
 interface AdminPanelProps {
@@ -25,6 +27,54 @@ interface AdminPanelProps {
 }
 
 export function AdminPanel({ onNavigate }: AdminPanelProps) {
+  const [analytics, setAnalytics] = useState({
+    totalUsers: 1247,
+    userGrowth: 12.5,
+    totalBookings: 845,
+    bookingGrowth: 18.3,
+    totalGuides: 156,
+    totalHotels: 89,
+    pendingGuideVerifications: 8,
+    pendingHotelVerifications: 4,
+    activeIncidents: 3,
+    activeSOSReports: 0,
+  });
+
+  useEffect(() => {
+    const loadDashboard = async () => {
+      try {
+        const response = await adminAPI.getDashboard();
+        const data = response?.data || {};
+        const overview = data?.overview || {};
+        const usersByRole = overview?.usersByRole || {};
+        const bookings = data?.bookings || {};
+        const verifications = data?.verifications || {};
+        const incidents = data?.incidents || {};
+        const growth = data?.growth || {};
+
+        setAnalytics({
+          totalUsers: Number(overview?.totalUsers || 0),
+          userGrowth: parseGrowthNumber(growth?.userGrowthWeek),
+          totalBookings: Number(bookings?.total || 0),
+          bookingGrowth: parseGrowthNumber(growth?.bookingGrowthWeek),
+          totalGuides: Number(usersByRole?.guides || 0),
+          totalHotels: Number(usersByRole?.hotels || 0),
+          pendingGuideVerifications: Number(verifications?.pendingGuideVerifications || 0),
+          pendingHotelVerifications: Number(verifications?.pendingHotelVerifications || 0),
+          activeIncidents: Number(incidents?.activeIncidents || 0),
+          activeSOSReports: Number(incidents?.activeSOSReports || 0),
+        });
+      } catch (error: any) {
+        console.warn("Failed to load admin dashboard:", error?.message || error);
+      }
+    };
+
+    void loadDashboard();
+  }, []);
+
+  const pendingVerifications =
+    analytics.pendingGuideVerifications + analytics.pendingHotelVerifications;
+
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header */}
@@ -49,7 +99,7 @@ export function AdminPanel({ onNavigate }: AdminPanelProps) {
                 <Text style={styles.metricLabel}>Total Users</Text>
               </View>
               <Text style={[styles.metricValue, styles.metricValueBlue]}>
-                {mockAnalytics.totalUsers.toLocaleString()}
+                {analytics.totalUsers.toLocaleString()}
               </Text>
               <View style={styles.growthBadge}>
                 <MaterialCommunityIcons
@@ -58,7 +108,7 @@ export function AdminPanel({ onNavigate }: AdminPanelProps) {
                   color="#10B981"
                 />
                 <Text style={styles.growthText}>
-                  +{mockAnalytics.userGrowth}% this month
+                  +{analytics.userGrowth}% this month
                 </Text>
               </View>
             </View>
@@ -74,7 +124,7 @@ export function AdminPanel({ onNavigate }: AdminPanelProps) {
                 <Text style={styles.metricLabel}>Bookings</Text>
               </View>
               <Text style={[styles.metricValue, styles.metricValueTeal]}>
-                {mockAnalytics.totalBookings.toLocaleString()}
+                {analytics.totalBookings.toLocaleString()}
               </Text>
               <View style={styles.growthBadge}>
                 <MaterialCommunityIcons
@@ -83,7 +133,7 @@ export function AdminPanel({ onNavigate }: AdminPanelProps) {
                   color="#10B981"
                 />
                 <Text style={styles.growthText}>
-                  +{mockAnalytics.bookingGrowth}% this month
+                  +{analytics.bookingGrowth}% this month
                 </Text>
               </View>
             </View>
@@ -99,7 +149,7 @@ export function AdminPanel({ onNavigate }: AdminPanelProps) {
                 <Text style={styles.metricLabel}>Guides</Text>
               </View>
               <Text style={[styles.metricValue, styles.metricValuePurple]}>
-                {mockAnalytics.totalGuides}
+                {analytics.totalGuides}
               </Text>
               <Text style={styles.metricSubtext}>Active providers</Text>
             </View>
@@ -115,7 +165,7 @@ export function AdminPanel({ onNavigate }: AdminPanelProps) {
                 <Text style={styles.metricLabel}>Hotels</Text>
               </View>
               <Text style={[styles.metricValue, styles.metricValueIndigo]}>
-                {mockAnalytics.totalHotels}
+                {analytics.totalHotels}
               </Text>
               <Text style={styles.metricSubtext}>Listed properties</Text>
             </View>
@@ -130,7 +180,7 @@ export function AdminPanel({ onNavigate }: AdminPanelProps) {
             <Text style={styles.sectionTitle}>Pending Actions</Text>
             <View style={styles.badge}>
               <Text style={styles.badgeText}>
-                {mockAnalytics.pendingVerifications}
+                {pendingVerifications}
               </Text>
             </View>
           </View>
@@ -150,12 +200,12 @@ export function AdminPanel({ onNavigate }: AdminPanelProps) {
                 <View style={styles.actionInfo}>
                   <Text style={styles.actionTitle}>Verify Guides</Text>
                   <Text style={styles.actionSubtitle}>
-                    8 pending verifications
+                    {analytics.pendingGuideVerifications} pending verifications
                   </Text>
                 </View>
               </View>
               <View style={[styles.actionBadge, styles.actionBadgeOrange]}>
-                <Text style={styles.actionBadgeText}>8</Text>
+                <Text style={styles.actionBadgeText}>{analytics.pendingGuideVerifications}</Text>
               </View>
             </TouchableOpacity>
 
@@ -173,12 +223,12 @@ export function AdminPanel({ onNavigate }: AdminPanelProps) {
                 <View style={styles.actionInfo}>
                   <Text style={styles.actionTitle}>Verify Hotels</Text>
                   <Text style={styles.actionSubtitle}>
-                    4 pending verifications
+                    {analytics.pendingHotelVerifications} pending verifications
                   </Text>
                 </View>
               </View>
               <View style={[styles.actionBadge, styles.actionBadgeBlue]}>
-                <Text style={styles.actionBadgeText}>4</Text>
+                <Text style={styles.actionBadgeText}>{analytics.pendingHotelVerifications}</Text>
               </View>
             </TouchableOpacity>
 
@@ -196,13 +246,13 @@ export function AdminPanel({ onNavigate }: AdminPanelProps) {
                 <View style={styles.actionInfo}>
                   <Text style={styles.actionTitle}>Incident Reports</Text>
                   <Text style={styles.actionSubtitle}>
-                    {mockAnalytics.activeIncidents} active reports
+                    {analytics.activeIncidents} incidents, {analytics.activeSOSReports} SOS
                   </Text>
                 </View>
               </View>
               <View style={[styles.actionBadge, styles.actionBadgeRed]}>
                 <Text style={styles.actionBadgeText}>
-                  {mockAnalytics.activeIncidents}
+                  {analytics.activeIncidents + analytics.activeSOSReports}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -263,7 +313,10 @@ export function AdminPanel({ onNavigate }: AdminPanelProps) {
           </TouchableOpacity>
 
           {/* Reports */}
-          <TouchableOpacity style={styles.managementCard}>
+          <TouchableOpacity
+            style={styles.managementCard}
+            onPress={() => onNavigate("activity-logs")}
+          >
             <View style={[styles.managementIcon, styles.managementIconIndigo]}>
               <MaterialCommunityIcons
                 name="file-document"

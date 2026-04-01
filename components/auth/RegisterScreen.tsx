@@ -2,15 +2,15 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import React, { useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { authAPI } from "../../constants/api";
 
@@ -83,32 +83,19 @@ export function RegisterScreen({
     { label: "10+ years", value: "10+" },
   ];
 
-  const handleVerifyOtp = () => {
-    // OTP verification not needed
-  };
-
-  const handleResendOtp = () => {
-    // Not needed
-  };
-
   const handleRegister = async () => {
-    console.log("🔷 handleRegister called");
-
     // Validate common fields
     if (!fullName || !email || !password || !confirmPassword || !phone) {
-      console.log("❌ Validation failed: Missing required fields");
       Alert.alert("Error", "Please fill in all required fields");
       return;
     }
 
     if (password !== confirmPassword) {
-      console.log("❌ Validation failed: Passwords do not match");
       Alert.alert("Error", "Passwords do not match");
       return;
     }
 
     if (password.length < 6) {
-      console.log("❌ Validation failed: Password too short");
       Alert.alert("Error", "Password must be at least 6 characters");
       return;
     }
@@ -116,21 +103,13 @@ export function RegisterScreen({
     // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      console.log("❌ Validation failed: Invalid email format");
       Alert.alert("Error", "Please enter a valid email address");
       return;
     }
 
-    console.log("✅ All validations passed, starting API call...");
     setIsLoading(true);
 
     try {
-      console.log("📤 Calling authAPI.register with:", {
-        fullName,
-        email,
-        phone,
-        role: selectedRole,
-      });
 
       // Call the backend API
       const response = await authAPI.register({
@@ -139,9 +118,11 @@ export function RegisterScreen({
         password: password,
         phone: phone,
         role: selectedRole,
+        experienceYears: selectedRole === "guide" ? experienceYears : undefined,
+        businessName: selectedRole === "hotel" ? businessName : undefined,
       });
 
-      console.log("✅ API Response received:", response);
+
 
       // Success message based on role
       let message = response.message || "Account created successfully!";
@@ -151,13 +132,10 @@ export function RegisterScreen({
         message = "Hotel account created! Pending admin verification.";
       }
 
-      console.log("🎉 Showing success alert:", message);
-      
       Alert.alert("Success", message, [
         { 
           text: "OK", 
           onPress: () => {
-            console.log("✅ User clicked OK - navigating to login");
             // Navigate to login screen instead of directly logging in
             onNavigateToLogin();
           }
@@ -165,23 +143,14 @@ export function RegisterScreen({
       ]);
     } catch (error: any) {
       // Handle errors from backend
-      console.error("❌ Registration error:", {
-        message: error?.message,
-        status: error?.status,
-        fullError: error,
-      });
-
       const errorMessage = error?.message || "Unable to register. Please try again.";
-      console.log("⚠️ Showing error alert:", errorMessage);
-      
       Alert.alert(
         "Registration Failed",
         errorMessage,
-        [{ text: "OK", onPress: () => console.log("User dismissed error") }]
+        [{ text: "OK" }]
       );
     } finally {
       setIsLoading(false);
-      console.log("🔄 Loading finished");
     }
   };
 
@@ -203,8 +172,8 @@ export function RegisterScreen({
 
         Alert.alert("Success", `${file.name} uploaded successfully`);
       }
-    } catch (error) {
-      Alert.alert("Error", "Failed to upload file");
+    } catch (uploadError: any) {
+      Alert.alert("Error", uploadError?.message || "Failed to upload file");
     }
   };
 
@@ -574,7 +543,7 @@ export function RegisterScreen({
 
               <View style={styles.warningBox}>
                 <Text style={styles.warningText}>
-                  ⚠️ Your account will be pending admin verification. You'll
+                  ⚠️ Your account will be pending admin verification. You&apos;ll
                   be notified once approved.
                 </Text>
               </View>
@@ -671,7 +640,7 @@ export function RegisterScreen({
 
               <View style={styles.warningBox}>
                 <Text style={styles.warningText}>
-                  ⚠️ Your account will be pending admin verification. You'll
+                  ⚠️ Your account will be pending admin verification. You&apos;ll
                   be notified once approved.
                 </Text>
               </View>

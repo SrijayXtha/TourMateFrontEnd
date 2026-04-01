@@ -13,13 +13,19 @@ import {
 
 interface IncidentReportProps {
   onBack: () => void;
-  onSubmit: () => void;
+  onSubmit: (payload: {
+    bookingId?: number;
+    incidentType: string;
+    details: string;
+    location?: string;
+  }) => Promise<void> | void;
 }
 
 export function IncidentReport({ onBack, onSubmit }: IncidentReportProps) {
   const [description, setDescription] = useState('');
   const [incidentType, setIncidentType] = useState('');
   const [imageUploaded, setImageUploaded] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const incidentTypes = [
     'Lost Item',
@@ -30,12 +36,22 @@ export function IncidentReport({ onBack, onSubmit }: IncidentReportProps) {
     'Other',
   ];
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!incidentType || !description) {
       Alert.alert('Required Fields', 'Please select an incident type and provide a description.');
       return;
     }
-    onSubmit();
+
+    setIsSubmitting(true);
+    try {
+      await onSubmit({
+        incidentType,
+        details: description.trim(),
+        location: '46.5197°N, 6.6323°E',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -163,15 +179,15 @@ export function IncidentReport({ onBack, onSubmit }: IncidentReportProps) {
         {/* Submit Button */}
         <TouchableOpacity
           onPress={handleSubmit}
-          disabled={!incidentType || !description}
+          disabled={!incidentType || !description || isSubmitting}
           style={[
             styles.submitButton,
-            (!incidentType || !description) && styles.submitButtonDisabled,
+            (!incidentType || !description || isSubmitting) && styles.submitButtonDisabled,
           ]}
         >
           <LinearGradient
             colors={
-              !incidentType || !description
+              !incidentType || !description || isSubmitting
                 ? ['#D1D5DB', '#D1D5DB']
                 : ['#F97316', '#EA580C']
             }
@@ -179,7 +195,9 @@ export function IncidentReport({ onBack, onSubmit }: IncidentReportProps) {
             end={{ x: 1, y: 0 }}
             style={styles.submitGradient}
           >
-            <Text style={styles.submitButtonText}>Submit Report</Text>
+            <Text style={styles.submitButtonText}>
+              {isSubmitting ? 'Submitting...' : 'Submit Report'}
+            </Text>
           </LinearGradient>
         </TouchableOpacity>
 

@@ -11,69 +11,69 @@ import {
 } from "react-native";
 import { adminAPI } from "../../constants/api";
 
-interface VerifyGuidesProps {
+interface VerifyHotelsProps {
   onBack: () => void;
 }
 
-type GuidesTab = "pending" | "verified";
+type HotelsTab = "pending" | "verified";
 
-interface GuideVerificationItem {
-  guideId: number;
+interface HotelVerificationItem {
+  hotelId: number;
   name?: string;
+  ownerName?: string;
   email?: string;
   phone?: string;
-  bio?: string;
-  experienceYears?: number;
-  licenseNumber?: string;
+  location?: string;
+  description?: string;
   verifiedStatus?: boolean;
 }
 
-export function VerifyGuides({ onBack }: VerifyGuidesProps) {
+export function VerifyHotels({ onBack }: VerifyHotelsProps) {
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<GuidesTab>("pending");
-  const [pendingGuides, setPendingGuides] = useState<GuideVerificationItem[]>([]);
-  const [verifiedGuides, setVerifiedGuides] = useState<GuideVerificationItem[]>([]);
+  const [activeTab, setActiveTab] = useState<HotelsTab>("pending");
+  const [pendingHotels, setPendingHotels] = useState<HotelVerificationItem[]>([]);
+  const [verifiedHotels, setVerifiedHotels] = useState<HotelVerificationItem[]>([]);
 
-  const loadGuides = async () => {
+  const loadHotels = async () => {
     setLoading(true);
     try {
       const [pendingRes, verifiedRes] = await Promise.all([
-        adminAPI.getPendingGuides(),
-        adminAPI.getGuides({ verified: true, page: 1, limit: 100 }),
+        adminAPI.getPendingHotels(),
+        adminAPI.getHotels({ verified: true, page: 1, limit: 100 }),
       ]);
 
-      setPendingGuides((pendingRes?.data?.guides || []) as GuideVerificationItem[]);
-      setVerifiedGuides((verifiedRes?.data?.guides || []) as GuideVerificationItem[]);
+      setPendingHotels((pendingRes?.data?.hotels || []) as HotelVerificationItem[]);
+      setVerifiedHotels((verifiedRes?.data?.hotels || []) as HotelVerificationItem[]);
     } catch (error: any) {
-      Alert.alert("Error", error?.message || "Failed to load guide verification data");
+      Alert.alert("Error", error?.message || "Failed to load hotel verification data");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    void loadGuides();
+    void loadHotels();
   }, []);
 
-  const approveGuide = async (guideId: number) => {
+  const approveHotel = async (hotelId: number) => {
     try {
-      await adminAPI.verifyGuide(guideId);
-      await loadGuides();
+      await adminAPI.verifyHotel(hotelId);
+      await loadHotels();
     } catch (error: any) {
-      Alert.alert("Action Failed", error?.message || "Unable to verify guide");
+      Alert.alert("Action Failed", error?.message || "Unable to verify hotel");
     }
   };
 
-  const rejectGuide = async (guideId: number) => {
+  const rejectHotel = async (hotelId: number) => {
     try {
-      await adminAPI.rejectGuide(guideId, "Profile details or submitted documents require updates");
-      await loadGuides();
+      await adminAPI.rejectHotel(hotelId, "Documents or profile details require updates");
+      await loadHotels();
     } catch (error: any) {
-      Alert.alert("Action Failed", error?.message || "Unable to reject guide");
+      Alert.alert("Action Failed", error?.message || "Unable to reject hotel");
     }
   };
 
-  const list = activeTab === "pending" ? pendingGuides : verifiedGuides;
+  const list = activeTab === "pending" ? pendingHotels : verifiedHotels;
 
   return (
     <View style={styles.container}>
@@ -82,8 +82,8 @@ export function VerifyGuides({ onBack }: VerifyGuidesProps) {
           <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
           <Text style={styles.backText}>Back</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Verify Guides</Text>
-        <Text style={styles.subtitle}>Review and approve guide applications</Text>
+        <Text style={styles.title}>Verify Hotels</Text>
+        <Text style={styles.subtitle}>Approve or reject hotel applications</Text>
       </View>
 
       <View style={styles.tabsRow}>
@@ -92,7 +92,7 @@ export function VerifyGuides({ onBack }: VerifyGuidesProps) {
           onPress={() => setActiveTab("pending")}
         >
           <Text style={[styles.tabText, activeTab === "pending" && styles.activeTabText]}>
-            Pending ({pendingGuides.length})
+            Pending ({pendingHotels.length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -100,7 +100,7 @@ export function VerifyGuides({ onBack }: VerifyGuidesProps) {
           onPress={() => setActiveTab("verified")}
         >
           <Text style={[styles.tabText, activeTab === "verified" && styles.activeTabText]}>
-            Verified ({verifiedGuides.length})
+            Verified ({verifiedHotels.length})
           </Text>
         </TouchableOpacity>
       </View>
@@ -111,21 +111,21 @@ export function VerifyGuides({ onBack }: VerifyGuidesProps) {
         </View>
       ) : (
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {list.map((guide) => (
-            <View key={guide.guideId} style={styles.card}>
-              <Text style={styles.name}>{guide.name || "Guide"}</Text>
-              <Text style={styles.meta}>Email: {guide.email || "N/A"}</Text>
-              <Text style={styles.meta}>Phone: {guide.phone || "N/A"}</Text>
-              <Text style={styles.meta}>Experience: {guide.experienceYears || 0} years</Text>
-              <Text style={styles.meta}>License: {guide.licenseNumber || "N/A"}</Text>
-              <Text style={styles.bio}>{guide.bio || "No bio provided"}</Text>
+          {list.map((hotel) => (
+            <View key={hotel.hotelId} style={styles.card}>
+              <Text style={styles.name}>{hotel.name || "Hotel"}</Text>
+              <Text style={styles.meta}>Owner: {hotel.ownerName || "N/A"}</Text>
+              <Text style={styles.meta}>Email: {hotel.email || "N/A"}</Text>
+              <Text style={styles.meta}>Phone: {hotel.phone || "N/A"}</Text>
+              <Text style={styles.meta}>Location: {hotel.location || "N/A"}</Text>
+              <Text style={styles.description}>{hotel.description || "No description provided"}</Text>
 
               {activeTab === "pending" ? (
                 <View style={styles.actionsRow}>
-                  <TouchableOpacity style={styles.approveButton} onPress={() => void approveGuide(guide.guideId)}>
+                  <TouchableOpacity style={styles.approveButton} onPress={() => void approveHotel(hotel.hotelId)}>
                     <Text style={styles.approveText}>Approve</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.rejectButton} onPress={() => void rejectGuide(guide.guideId)}>
+                  <TouchableOpacity style={styles.rejectButton} onPress={() => void rejectHotel(hotel.hotelId)}>
                     <Text style={styles.rejectText}>Reject</Text>
                   </TouchableOpacity>
                 </View>
@@ -140,8 +140,8 @@ export function VerifyGuides({ onBack }: VerifyGuidesProps) {
 
           {list.length === 0 && (
             <View style={styles.emptyState}>
-              <MaterialCommunityIcons name="account-search" size={56} color="#9CA3AF" />
-              <Text style={styles.emptyText}>No guides in this category</Text>
+              <MaterialCommunityIcons name="office-building-remove" size={56} color="#9CA3AF" />
+              <Text style={styles.emptyText}>No hotels in this category</Text>
             </View>
           )}
         </ScrollView>
@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
   },
   name: { fontSize: 16, fontWeight: "700", color: "#111827" },
   meta: { fontSize: 12, color: "#6B7280", marginTop: 3 },
-  bio: { marginTop: 8, color: "#374151", fontSize: 13 },
+  description: { marginTop: 8, color: "#374151", fontSize: 13 },
   actionsRow: { flexDirection: "row", gap: 8, marginTop: 12 },
   approveButton: {
     flex: 1,
@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 10,
   },
-  approveText: { color: "#fff", fontWeight: "700", fontSize: 13 },
+  approveText: { color: "#fff", fontSize: 13, fontWeight: "700" },
   rejectButton: {
     flex: 1,
     borderWidth: 1,
@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     backgroundColor: "#fff",
   },
-  rejectText: { color: "#DC2626", fontWeight: "700", fontSize: 13 },
+  rejectText: { color: "#DC2626", fontSize: 13, fontWeight: "700" },
   verifiedBadge: {
     marginTop: 12,
     flexDirection: "row",
@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
-  verifiedText: { color: "#15803D", fontWeight: "700", fontSize: 12 },
+  verifiedText: { color: "#15803D", fontSize: 12, fontWeight: "700" },
   emptyState: { alignItems: "center", marginTop: 90 },
   emptyText: { marginTop: 8, color: "#6B7280" },
 });
