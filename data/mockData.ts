@@ -11,6 +11,7 @@ export interface Guide {
   rating: number;
   experience: string;
   specialties: string[];
+  specialityLocations?: string[];
   pricePerDay: string;
   verified: boolean;
   bio?: string;
@@ -29,6 +30,7 @@ export const mockGuides: Guide[] = [
     rating: 4.9,
     experience: "8 years",
     specialties: ["Mountain Trekking", "Wildlife Tours"],
+    specialityLocations: ["Sagarmatha", "Everest Region", "Annapurna Region"],
     pricePerDay: "Rs 1200",
     verified: true,
     bio: "Experienced mountain guide specializing in Himalayan treks and wildlife tours.",
@@ -48,6 +50,7 @@ export const mockGuides: Guide[] = [
     rating: 4.8,
     experience: "5 years",
     specialties: ["Cultural Tours", "Food Tours"],
+    specialityLocations: ["Kathmandu Valley", "Lumbini"],
     pricePerDay: "Rs 1000",
     verified: true,
     bio: "Cultural expert specializing in heritage sites and authentic local cuisine experiences.",
@@ -66,6 +69,7 @@ export const mockGuides: Guide[] = [
     rating: 4.7,
     experience: "6 years",
     specialties: ["Coastal Tours", "Photography", "Adventure Sports"],
+    specialityLocations: ["Pokhara", "Annapurna Region"],
     pricePerDay: "Rs 1100",
     verified: true,
     bio: "Coastal adventure specialist with expertise in beach activities and photography.",
@@ -84,6 +88,7 @@ export const mockGuides: Guide[] = [
     rating: 4.9,
     experience: "7 years",
     specialties: ["Historical Sites", "Temple Tours", "Heritage Walks"],
+    specialityLocations: ["Lumbini", "Kathmandu Valley"],
     pricePerDay: "Rs 950",
     verified: true,
     bio: "Heritage and history specialist with deep knowledge of ancient temples and monuments.",
@@ -103,6 +108,7 @@ export const mockGuides: Guide[] = [
     rating: 4.6,
     experience: "9 years",
     specialties: ["Desert Safari", "Camping", "Stargazing"],
+    specialityLocations: ["Chitwan National Park"],
     pricePerDay: "Rs 1350",
     verified: true,
     bio: "Desert adventure expert specializing in safari tours and desert camping experiences.",
@@ -121,6 +127,7 @@ export const mockGuides: Guide[] = [
     rating: 4.8,
     experience: "6 years",
     specialties: ["Yoga Retreats", "Wellness Tours", "Spiritual Journeys"],
+    specialityLocations: ["Pokhara", "Lumbini"],
     pricePerDay: "Rs 1150",
     verified: true,
     bio: "Wellness and spirituality guide specializing in yoga retreats and meditation tours.",

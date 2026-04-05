@@ -540,6 +540,7 @@ export default function Index() {
 
     return (
       <AdminPanel
+        onLogout={() => void handleLogout()}
         onNavigate={(screen) => {
           if (
             screen === "verify-guides" ||

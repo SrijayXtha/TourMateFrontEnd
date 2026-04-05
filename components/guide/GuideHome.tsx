@@ -60,6 +60,7 @@ export function GuideHome({ onNavigate }: GuideHomeProps) {
   const [isAvailable, setIsAvailable] = useState(true);
   const [guideFirstName, setGuideFirstName] = useState("John");
   const [guideRoleLabel, setGuideRoleLabel] = useState("Mountain Guide Expert");
+  const [registeredLocation, setRegisteredLocation] = useState("Not selected");
   const [verificationStatus, setVerificationStatus] = useState<
     "verified" | "pending" | "rejected"
   >("verified");
@@ -149,6 +150,9 @@ export function GuideHome({ onNavigate }: GuideHomeProps) {
       if (experienceYears > 0) {
         setGuideRoleLabel(`${experienceYears}+ years experience`);
       }
+
+      const profileLocation = String(profileGuide.specialityLocation || "").trim();
+      setRegisteredLocation(profileLocation || "Not selected");
 
       const isVerified =
         profileGuide.verifiedStatus ?? dashboardGuide.verified_status ?? null;
@@ -375,6 +379,32 @@ export function GuideHome({ onNavigate }: GuideHomeProps) {
               thumbColor={isAvailable ? "#16a34a" : "#d1d5db"}
             />
           </View>
+        </View>
+
+        {/* Registered Location */}
+        <View style={styles.card}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleContainer}>
+              <MaterialCommunityIcons
+                name="map-marker"
+                size={20}
+                color="#2563eb"
+              />
+              <Text style={styles.sectionTitle}>Registered Location</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.manageLocationButton}
+              onPress={() => onNavigate("guide-settings")}
+            >
+              <Text style={styles.manageLocationText}>
+                {registeredLocation === "Not selected" ? "Select" : "Change"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.registeredLocationValue}>{registeredLocation}</Text>
+          <Text style={styles.registeredLocationHint}>
+            Set your speciality location so tourists can find you by place.
+          </Text>
         </View>
 
         {/* Incoming Booking Requests */}
@@ -842,6 +872,29 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#9ca3af",
     marginTop: 2,
+  },
+  manageLocationButton: {
+    borderWidth: 1,
+    borderColor: "#dbeafe",
+    backgroundColor: "#eff6ff",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  manageLocationText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#1d4ed8",
+  },
+  registeredLocationValue: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1f2937",
+    marginBottom: 6,
+  },
+  registeredLocationHint: {
+    fontSize: 12,
+    color: "#6b7280",
   },
   sectionHeader: {
     flexDirection: "row",

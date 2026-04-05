@@ -47,10 +47,58 @@ export function DestinationDetails({ destination, onBack, onNavigate }: Destinat
     }
   };
 
-  // Get guides for this destination
-  const availableGuides = mockGuides.filter(
-    (guide: any) => guide.destinationId === destination.id
+  const getMinimumDurationDays = (durationLabel: string) => {
+    const match = String(durationLabel || '').match(/\d+/);
+    const parsed = match ? Number.parseInt(match[0], 10) : 1;
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
+  };
+
+  const normalize = (value?: string) =>
+    String(value || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  const tokenize = (value?: string) =>
+    normalize(value)
+      .split(' ')
+      .filter((token) => token.length >= 3 && token !== 'nepal');
+
+  const destinationLocationTokens = Array.from(new Set(tokenize(destination.location)));
+  const minimumDurationDays = getMinimumDurationDays(destination.duration);
+  const destinationThemeTokens = Array.from(
+    new Set(
+      [destination.name, destination.category, ...destination.activities].flatMap((entry) =>
+        tokenize(entry)
+      )
+    )
   );
+
+  // Match guides by destination location first; if absent, fallback to relevant specialties.
+  const availableGuides = mockGuides.filter((guide: any) => {
+    if (!guide.verified) {
+      return false;
+    }
+
+    const specialityLocations = Array.isArray(guide.specialityLocations)
+      ? guide.specialityLocations
+      : [];
+
+    const guideSearchText = normalize(
+      [guide.location, guide.bio, ...(guide.specialties || []), ...specialityLocations].join(' ')
+    );
+
+    const hasLocationMatch = destinationLocationTokens.some((token) =>
+      guideSearchText.includes(token)
+    );
+
+    if (hasLocationMatch) {
+      return true;
+    }
+
+    return destinationThemeTokens.some((token) => guideSearchText.includes(token));
+  });
 
   // Get nearby hotels (mock for now)
   const nearbyHotels = mockHotels.slice(0, 2);
@@ -231,7 +279,14 @@ export function DestinationDetails({ destination, onBack, onNavigate }: Destinat
 
                         <TouchableOpacity
                           style={styles.selectGuideButton}
-                          onPress={() => onNavigate('guide-profile', guide)}
+                          onPress={() =>
+                            onNavigate('guide-profile', {
+                              ...guide,
+                              minDurationDays: minimumDurationDays,
+                              minDurationLabel: destination.duration,
+                              destinationName: destination.name,
+                            })
+                          }
                         >
                           <Text style={styles.selectGuideButtonText}>Select Guide</Text>
                         </TouchableOpacity>

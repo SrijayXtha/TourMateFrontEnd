@@ -24,9 +24,10 @@ const parseGrowthNumber = (value: unknown): number => {
 
 interface AdminPanelProps {
   onNavigate: (screen: string) => void;
+  onLogout: () => void;
 }
 
-export function AdminPanel({ onNavigate }: AdminPanelProps) {
+export function AdminPanel({ onNavigate, onLogout }: AdminPanelProps) {
   const [analytics, setAnalytics] = useState({
     totalUsers: 1247,
     userGrowth: 12.5,
@@ -79,7 +80,13 @@ export function AdminPanel({ onNavigate }: AdminPanelProps) {
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Admin Dashboard</Text>
+        <View style={styles.headerTop}>
+          <Text style={styles.headerTitle}>Admin Dashboard</Text>
+          <TouchableOpacity style={styles.logoutButton} onPress={onLogout}>
+            <MaterialCommunityIcons name="logout" size={16} color="#FFFFFF" />
+            <Text style={styles.logoutButtonText}>Logout</Text>
+          </TouchableOpacity>
+        </View>
         <Text style={styles.headerSubtitle}>Manage TourMate platform</Text>
       </View>
 
@@ -404,11 +411,32 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
   },
+  headerTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+  },
   headerTitle: {
     color: "#FFFFFF",
     fontSize: 28,
     fontWeight: "700",
     marginBottom: 8,
+  },
+  logoutButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.35)",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  logoutButtonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "700",
   },
   headerSubtitle: {
     color: "rgba(255, 255, 255, 0.9)",

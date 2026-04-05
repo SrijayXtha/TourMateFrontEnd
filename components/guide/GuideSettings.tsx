@@ -18,11 +18,23 @@ interface GuideSettingsProps {
   onLogout: () => void;
 }
 
+const REGISTERED_GUIDE_LOCATIONS = [
+  "Kathmandu Valley",
+  "Pokhara",
+  "Sagarmatha",
+  "Annapurna Region",
+  "Chitwan National Park",
+  "Lumbini",
+  "Nagarkot",
+  "Mustang",
+];
+
 export function GuideSettings({ onBack, onLogout }: GuideSettingsProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [bio, setBio] = useState("");
   const [experienceYears, setExperienceYears] = useState("0");
+  const [specialityLocation, setSpecialityLocation] = useState("");
   const [isAvailable, setIsAvailable] = useState(true);
   const [verifiedStatus, setVerifiedStatus] = useState(false);
 
@@ -33,6 +45,7 @@ export function GuideSettings({ onBack, onLogout }: GuideSettingsProps) {
       const profile = response?.data?.guide || {};
       setBio(profile.bio || "");
       setExperienceYears(String(profile.experienceYears || 0));
+      setSpecialityLocation(profile.specialityLocation || "");
       setIsAvailable(Boolean(profile.isAvailable ?? true));
       setVerifiedStatus(Boolean(profile.verifiedStatus));
     } catch (error: any) {
@@ -53,12 +66,19 @@ export function GuideSettings({ onBack, onLogout }: GuideSettingsProps) {
       return;
     }
 
+    const normalizedLocation = specialityLocation.trim();
+    if (!normalizedLocation) {
+      Alert.alert("Validation", "Please select your registered speciality location");
+      return;
+    }
+
     setSaving(true);
     try {
       await guideAPI.updateProfile({
         bio: bio.trim() || undefined,
         experienceYears: parsedExperience,
         isAvailable,
+        specialityLocation: normalizedLocation,
       });
       await guideAPI.updateAvailability(isAvailable);
       Alert.alert("Success", "Guide profile updated");
@@ -119,6 +139,36 @@ export function GuideSettings({ onBack, onLogout }: GuideSettingsProps) {
             keyboardType="number-pad"
             placeholder="Experience years"
           />
+
+          <Text style={styles.inputLabel}>Registered Speciality Location</Text>
+          <View style={styles.locationChipsContainer}>
+            {REGISTERED_GUIDE_LOCATIONS.map((location) => {
+              const selected = specialityLocation === location;
+              return (
+                <TouchableOpacity
+                  key={location}
+                  style={[styles.locationChip, selected && styles.locationChipActive]}
+                  onPress={() => setSpecialityLocation(location)}
+                >
+                  <MaterialCommunityIcons
+                    name={selected ? "check-circle" : "map-marker-outline"}
+                    size={14}
+                    color={selected ? "#1B73E8" : "#6B7280"}
+                  />
+                  <Text
+                    style={[styles.locationChipText, selected && styles.locationChipTextActive]}
+                  >
+                    {location}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <Text style={styles.locationHint}>
+            {specialityLocation
+              ? `Selected location: ${specialityLocation}`
+              : "Choose your main service location so tourists can find you by place."}
+          </Text>
 
           <View style={styles.toggleRow}>
             <View>
@@ -183,7 +233,48 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     backgroundColor: "#fff",
   },
+  inputLabel: {
+    fontSize: 13,
+    color: "#374151",
+    fontWeight: "600",
+    marginBottom: 8,
+    marginTop: 4,
+  },
   multilineInput: { minHeight: 90, textAlignVertical: "top" },
+  locationChipsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 8,
+  },
+  locationChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: "#F9FAFB",
+  },
+  locationChipActive: {
+    borderColor: "#BFDBFE",
+    backgroundColor: "#EFF6FF",
+  },
+  locationChipText: {
+    fontSize: 12,
+    color: "#4B5563",
+    fontWeight: "500",
+  },
+  locationChipTextActive: {
+    color: "#1E40AF",
+  },
+  locationHint: {
+    fontSize: 12,
+    color: "#6B7280",
+    marginBottom: 12,
+  },
   toggleRow: {
     flexDirection: "row",
     alignItems: "center",

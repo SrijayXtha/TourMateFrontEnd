@@ -1,8 +1,10 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import React, { useState } from 'react';
 import {
     Alert,
     Image,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -30,6 +32,9 @@ interface Guide {
   location?: string;
   reviews?: Review[];
   availability?: string[];
+  minDurationDays?: number;
+  minDurationLabel?: string;
+  destinationName?: string;
 }
 
 interface GuideProfileProps {
@@ -41,7 +46,53 @@ interface GuideProfileProps {
 export function GuideProfile({ guide, onBack, onBook }: GuideProfileProps) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
   const [activeDateField, setActiveDateField] = useState<'start' | 'end'>('start');
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const toIsoDate = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const parseIsoDate = (value: string): Date | null => {
+    const [year, month, day] = value.split('-').map((part) => Number.parseInt(part, 10));
+    if (!year || !month || !day) {
+      return null;
+    }
+
+    const parsed = new Date(year, month - 1, day);
+    parsed.setHours(0, 0, 0, 0);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
+
+  const startDateValue = parseIsoDate(startDate);
+  const endDateValue = parseIsoDate(endDate);
+  const minimumDurationDays = Math.max(1, Number(guide.minDurationDays) || 1);
+  const minimumDurationLabel = guide.minDurationLabel || `${minimumDurationDays} days`;
+  const pickerDisplay = Platform.OS === 'ios' ? 'spinner' : 'calendar';
+  const iosPickerAppearance =
+    Platform.OS === 'ios'
+      ? {
+          textColor: '#111827',
+          accentColor: '#1B73E8',
+          themeVariant: 'light' as const,
+        }
+      : {};
+
+  const addDays = (date: Date, days: number) => {
+    const next = new Date(date);
+    next.setDate(next.getDate() + days);
+    next.setHours(0, 0, 0, 0);
+    return next;
+  };
+
+  const minimumEndDate = addDays(startDateValue || today, minimumDurationDays);
 
   const handleMessageGuide = () => {
     Alert.alert(
@@ -57,17 +108,23 @@ export function GuideProfile({ guide, onBack, onBook }: GuideProfileProps) {
       return;
     }
 
-    if (new Date(endDate) < new Date(startDate)) {
-      Alert.alert('Invalid Date Range', 'End date must be the same as or after the start date.');
+    const start = parseIsoDate(startDate);
+    const end = parseIsoDate(endDate);
+    if (!start || !end) {
+      Alert.alert('Invalid Date', 'Please choose valid booking dates.');
+      return;
+    }
+
+    const requiredEndDate = addDays(start, minimumDurationDays);
+    if (end < requiredEndDate) {
+      Alert.alert(
+        'Minimum Duration Required',
+        `This trip requires at least ${minimumDurationLabel}. Please choose an end date on or after ${requiredEndDate.toLocaleDateString('en-US')}.`
+      );
       return;
     }
 
     onBook(startDate, endDate);
-  };
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
   const formatInputDate = (dateStr: string) => {
@@ -75,34 +132,53 @@ export function GuideProfile({ guide, onBack, onBook }: GuideProfileProps) {
     return date.toLocaleDateString('en-US');
   };
 
-  const handleSelectDate = (field: 'start' | 'end') => {
-    const dates = (guide.availability || []).slice(0, 12);
+  const handleStartPickerChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    if (Platform.OS !== 'ios') {
+      setShowStartPicker(false);
+    }
 
-    if (dates.length === 0) {
-      Alert.alert('No Dates Available', 'This guide has no available dates right now.');
+    if (event.type === 'dismissed' || !selectedDate) {
       return;
     }
 
-    const buttons = [
-      ...dates.map((date) => ({
-        text: formatDate(date),
-        onPress: () => {
-          setActiveDateField(field);
-          if (field === 'start') {
-            setStartDate(date);
-          } else {
-            setEndDate(date);
-          }
-        },
-      })),
-      { text: 'Cancel', style: 'cancel' as const },
-    ];
+    selectedDate.setHours(0, 0, 0, 0);
+    const isoStartDate = toIsoDate(selectedDate);
+    const minAllowedEndDate = addDays(selectedDate, minimumDurationDays);
+    const isoMinimumEndDate = toIsoDate(minAllowedEndDate);
+
+    setStartDate(isoStartDate);
+    setEndDate(isoMinimumEndDate);
+
+    if (endDateValue && endDateValue > minAllowedEndDate) {
+      setEndDate(toIsoDate(endDateValue));
+    }
 
     Alert.alert(
-      field === 'start' ? 'Select Start Date' : 'Select End Date',
-      'Choose an available date',
-      buttons
+      'Minimum Duration Applied',
+      `End date has been set to the minimum required duration (${minimumDurationLabel}). You can select a later end date if needed.`
     );
+  };
+
+  const handleEndPickerChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    if (Platform.OS !== 'ios') {
+      setShowEndPicker(false);
+    }
+
+    if (event.type === 'dismissed' || !selectedDate) {
+      return;
+    }
+
+    selectedDate.setHours(0, 0, 0, 0);
+    const minEndDate = addDays(startDateValue || today, minimumDurationDays);
+    if (selectedDate < minEndDate) {
+      Alert.alert(
+        'Minimum Duration Required',
+        `End date cannot be before the minimum duration (${minimumDurationLabel}).`
+      );
+      return;
+    }
+
+    setEndDate(toIsoDate(selectedDate));
   };
 
   return (
@@ -195,50 +271,86 @@ export function GuideProfile({ guide, onBack, onBook }: GuideProfileProps) {
           </View>
         </View>
 
-        {/* Availability */}
-        {guide.availability && guide.availability.length > 0 && (
-          <View style={styles.card}>
-            <View style={styles.availabilityHeader}>
-              <MaterialCommunityIcons name="calendar" size={20} color="#1B73E8" />
-              <Text style={styles.cardTitle}>Select Booking Dates</Text>
-            </View>
-
-            <Text style={styles.dateLabel}>Start Date</Text>
-            <TouchableOpacity
-              onPress={() => handleSelectDate('start')}
-              style={[
-                styles.dateInput,
-                activeDateField === 'start' && styles.dateInputActive,
-              ]}
-            >
-              <Text style={[styles.dateInputText, !startDate && styles.dateInputPlaceholder]}>
-                {startDate ? formatInputDate(startDate) : 'mm/dd/yyyy'}
-              </Text>
-              <MaterialCommunityIcons name="calendar-month-outline" size={20} color="#111827" />
-            </TouchableOpacity>
-
-            <Text style={styles.dateLabel}>End Date</Text>
-            <TouchableOpacity
-              onPress={() => handleSelectDate('end')}
-              style={[
-                styles.dateInput,
-                activeDateField === 'end' && styles.dateInputActive,
-              ]}
-            >
-              <Text style={[styles.dateInputText, !endDate && styles.dateInputPlaceholder]}>
-                {endDate ? formatInputDate(endDate) : 'mm/dd/yyyy'}
-              </Text>
-              <MaterialCommunityIcons name="calendar-month-outline" size={20} color="#111827" />
-            </TouchableOpacity>
-
-            <View style={styles.availableDatesInfo}>
-              <MaterialCommunityIcons name="calendar-blank-outline" size={14} color="#1B73E8" />
-              <Text style={styles.availableDatesText}>
-                Available dates: {guide.availability.map(formatDate).join(', ')}
-              </Text>
-            </View>
+        {/* Booking Dates */}
+        <View style={styles.card}>
+          <View style={styles.availabilityHeader}>
+            <MaterialCommunityIcons name="calendar" size={20} color="#1B73E8" />
+            <Text style={styles.cardTitle}>Select Booking Dates</Text>
           </View>
-        )}
+
+          <Text style={styles.dateLabel}>Start Date</Text>
+          <TouchableOpacity
+            onPress={() => {
+              setActiveDateField('start');
+              setShowStartPicker(true);
+            }}
+            style={[
+              styles.dateInput,
+              activeDateField === 'start' && styles.dateInputActive,
+            ]}
+          >
+            <Text style={[styles.dateInputText, !startDate && styles.dateInputPlaceholder]}>
+              {startDate ? formatInputDate(startDate) : 'mm/dd/yyyy'}
+            </Text>
+            <MaterialCommunityIcons name="calendar-month-outline" size={20} color="#111827" />
+          </TouchableOpacity>
+
+          <Text style={styles.dateLabel}>End Date</Text>
+          <TouchableOpacity
+            onPress={() => {
+              if (!startDate) {
+                Alert.alert('Select Start Date', 'Please select your start date first.');
+                return;
+              }
+              setActiveDateField('end');
+              setShowEndPicker(true);
+            }}
+            style={[
+              styles.dateInput,
+              activeDateField === 'end' && styles.dateInputActive,
+            ]}
+          >
+            <Text style={[styles.dateInputText, !endDate && styles.dateInputPlaceholder]}>
+              {endDate ? formatInputDate(endDate) : 'mm/dd/yyyy'}
+            </Text>
+            <MaterialCommunityIcons name="calendar-month-outline" size={20} color="#111827" />
+          </TouchableOpacity>
+
+          {showStartPicker && (
+            <View style={styles.pickerSurface}>
+              <DateTimePicker
+                value={startDateValue || today}
+                mode="date"
+                display={pickerDisplay}
+                minimumDate={today}
+                onChange={handleStartPickerChange}
+                {...iosPickerAppearance}
+              />
+            </View>
+          )}
+
+          {showEndPicker && (
+            <View style={styles.pickerSurface}>
+              <DateTimePicker
+                value={endDateValue || startDateValue || today}
+                mode="date"
+                display={pickerDisplay}
+                minimumDate={minimumEndDate}
+                onChange={handleEndPickerChange}
+                {...iosPickerAppearance}
+              />
+            </View>
+          )}
+
+          <View style={styles.availableDatesInfo}>
+            <MaterialCommunityIcons name="calendar-blank-outline" size={14} color="#1B73E8" />
+            <Text style={styles.availableDatesText}>
+              {guide.destinationName
+                ? `${guide.destinationName} requires a minimum tour duration of ${minimumDurationLabel}. End date auto-sets to the minimum and you can only extend it.`
+                : `Minimum tour duration is ${minimumDurationLabel}. End date auto-sets to the minimum and you can only extend it.`}
+            </Text>
+          </View>
+        </View>
 
         {/* Reviews */}
         {guide.reviews && guide.reviews.length > 0 && (
@@ -499,6 +611,14 @@ const styles = StyleSheet.create({
   },
   dateInputPlaceholder: {
     color: '#9CA3AF',
+  },
+  pickerSurface: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+    marginBottom: 12,
+    overflow: 'hidden',
   },
   availableDatesInfo: {
     flexDirection: 'row',
