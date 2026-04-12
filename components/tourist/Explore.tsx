@@ -1,5 +1,4 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import {
     StyleSheet,
@@ -7,6 +6,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { TouristTopBar } from '../common/TouristTopBar';
 import { ExploreDestinationsTab } from './ExploreDestinationsTab';
 import { ExploreGuidesTab } from './ExploreGuidesTab';
 import { ExploreHotelsTab } from './ExploreHotelsTab';
@@ -22,21 +22,11 @@ export function Explore({ onNavigate, onBack }: ExploreProps) {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <LinearGradient
-        colors={['#1B73E8', '#2BC7B2']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.header}
-      >
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
-          <Text style={styles.backText}>Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Explore</Text>
-        <Text style={styles.headerSubtitle}>
-          Discover amazing destinations, guides and hotels
-        </Text>
-      </LinearGradient>
+      <TouristTopBar
+        title="Explore"
+        subtitle="Discover amazing destinations, guides and hotels"
+        onBack={onBack}
+      />
 
       {/* Tabs */}
       <View style={styles.tabsContainer}>

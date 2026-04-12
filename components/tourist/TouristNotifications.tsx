@@ -10,6 +10,7 @@ import {
     View,
 } from "react-native";
 import { touristAPI } from "../../constants/api";
+import { TouristTopBar } from "../common/TouristTopBar";
 
 interface TouristNotificationsProps {
   onBack: () => void;
@@ -75,14 +76,7 @@ export function TouristNotifications({ onBack }: TouristNotificationsProps) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
-          <Text style={styles.backText}>Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Notifications</Text>
-        <Text style={styles.subtitle}>Unread: {unreadCount}</Text>
-      </View>
+      <TouristTopBar title="Notifications" subtitle={`Unread: ${unreadCount}`} onBack={onBack} />
 
       <View style={styles.actionBar}>
         <TouchableOpacity style={styles.markAllButton} onPress={() => void markAllRead()}>

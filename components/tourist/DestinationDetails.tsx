@@ -10,6 +10,7 @@ import {
     View,
 } from 'react-native';
 import { mockGuides, mockHotels } from '../../data/mockData';
+import { TouristTopBar } from '../common/TouristTopBar';
 
 interface Destination {
   id: string;
@@ -116,6 +117,12 @@ export function DestinationDetails({ destination, onBack, onNavigate }: Destinat
 
   return (
     <View style={styles.container}>
+      <TouristTopBar
+        title={destination.name}
+        subtitle={destination.location}
+        onBack={onBack}
+      />
+
       {/* Header Image */}
       <View style={styles.imageContainer}>
         <Image
@@ -123,9 +130,6 @@ export function DestinationDetails({ destination, onBack, onNavigate }: Destinat
           style={styles.headerImage}
           resizeMode="cover"
         />
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#1F2937" />
-        </TouchableOpacity>
         <View
           style={[
             styles.difficultyBadge,

@@ -9,6 +9,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { TouristTopBar } from '../common/TouristTopBar';
 
 interface Hotel {
   id: string;
@@ -97,6 +98,8 @@ export function HotelDetails({ hotel, onBack, onBook }: HotelDetailsProps) {
 
   return (
     <View style={styles.container}>
+      <TouristTopBar title={hotel.name} subtitle={hotel.location} onBack={onBack} />
+
       {/* Header Image */}
       <View style={styles.imageContainer}>
         <Image
@@ -104,9 +107,6 @@ export function HotelDetails({ hotel, onBack, onBook }: HotelDetailsProps) {
           style={styles.headerImage}
           resizeMode="cover"
         />
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#1F2937" />
-        </TouchableOpacity>
         {hotel.verified && (
           <View style={styles.verifiedBadge}>
             <MaterialCommunityIcons name="check-circle" size={16} color="#fff" />

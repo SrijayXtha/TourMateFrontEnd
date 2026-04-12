@@ -11,6 +11,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { TouristTopBar } from '../common/TouristTopBar';
 
 interface Review {
   user: string;
@@ -41,9 +42,10 @@ interface GuideProfileProps {
   guide: Guide;
   onBack: () => void;
   onBook: (startDate: string, endDate: string) => void;
+  onMessage?: () => void;
 }
 
-export function GuideProfile({ guide, onBack, onBook }: GuideProfileProps) {
+export function GuideProfile({ guide, onBack, onBook, onMessage }: GuideProfileProps) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [showStartPicker, setShowStartPicker] = useState(false);
@@ -95,6 +97,11 @@ export function GuideProfile({ guide, onBack, onBook }: GuideProfileProps) {
   const minimumEndDate = addDays(startDateValue || today, minimumDurationDays);
 
   const handleMessageGuide = () => {
+    if (onMessage) {
+      onMessage();
+      return;
+    }
+
     Alert.alert(
       `Opening chat with ${guide.name}`,
       'Start a conversation to discuss your trip details',
@@ -184,12 +191,7 @@ export function GuideProfile({ guide, onBack, onBook }: GuideProfileProps) {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
-          <Text style={styles.backText}>Back to Guides</Text>
-        </TouchableOpacity>
-      </View>
+      <TouristTopBar title={guide.name} subtitle="Guide Profile" onBack={onBack} />
 
       {/* Content */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>

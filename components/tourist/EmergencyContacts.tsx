@@ -10,6 +10,7 @@ import {
     View,
 } from "react-native";
 import { mockEmergencyContacts } from "../../data/mockData";
+import { TouristTopBar } from "../common/TouristTopBar";
 
 interface EmergencyContactsProps {
   onBack: () => void;
@@ -39,16 +40,11 @@ export function EmergencyContacts({ onBack }: EmergencyContactsProps) {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
-          <Text style={styles.backButtonText}>Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Emergency Contacts</Text>
-        <Text style={styles.headerSubtitle}>
-          Important numbers you should know
-        </Text>
-      </View>
+      <TouristTopBar
+        title="Emergency Contacts"
+        subtitle="Important numbers you should know"
+        onBack={onBack}
+      />
 
       <ScrollView
         style={styles.content}

@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
     Image,
     ScrollView,
@@ -9,7 +9,9 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { authAPI, touristAPI } from "../../constants/api";
 import { mockDestinations, mockGuides } from "../../data/mockData";
+import { TouristTopBar } from "../common/TouristTopBar";
 
 interface TouristHomeProps {
   onNavigate: (screen: string, data?: any) => void;
@@ -17,6 +19,36 @@ interface TouristHomeProps {
 
 export function TouristHome({ onNavigate }: TouristHomeProps) {
   const [activeTab, setActiveTab] = useState("home");
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+
+  const loadUnreadMessageCount = useCallback(async () => {
+    try {
+      const [user, messageResponse] = await Promise.all([
+        authAPI.getCurrentUser(),
+        touristAPI.getMessages(),
+      ]);
+
+      const currentUserId = Number(user?.id || 0);
+      if (!Number.isInteger(currentUserId) || currentUserId <= 0) {
+        setUnreadMessageCount(0);
+        return;
+      }
+
+      const messages = (messageResponse?.data?.messages || []) as any[];
+      const unreadCount = messages.filter((message) => {
+        const receiverId = Number(message?.receiver?.user_id || 0);
+        return receiverId === currentUserId && !Boolean(message?.isRead);
+      }).length;
+
+      setUnreadMessageCount(unreadCount);
+    } catch {
+      setUnreadMessageCount(0);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadUnreadMessageCount();
+  }, [loadUnreadMessageCount]);
 
   const safetyCards = [
     {
@@ -57,10 +89,11 @@ export function TouristHome({ onNavigate }: TouristHomeProps) {
     <View style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Welcome, Explorer!</Text>
-          <Text style={styles.headerSubtitle}>Ready for your next adventure?</Text>
-        </View>
+        <TouristTopBar
+          title="Welcome, Explorer!"
+          subtitle="Ready for your next adventure?"
+          showBack={false}
+        />
 
         {/* Quick Stats */}
         <View style={styles.statsContainer}>
@@ -176,6 +209,24 @@ export function TouristHome({ onNavigate }: TouristHomeProps) {
           </View>
         </View>
       </ScrollView>
+
+      <TouchableOpacity
+        style={styles.floatingMessageButton}
+        onPress={() => onNavigate("messages")}
+        activeOpacity={0.85}
+      >
+        <View style={styles.floatingMessageIconWrap}>
+          <MaterialCommunityIcons name="navigation-variant-outline" size={30} color="#4B5563" />
+          <View style={styles.floatingMessageIconAccent} />
+        </View>
+        {unreadMessageCount > 0 && (
+          <View style={styles.floatingMessageBadge}>
+            <Text style={styles.floatingMessageBadgeText}>
+              {unreadMessageCount > 99 ? "99+" : unreadMessageCount}
+            </Text>
+          </View>
+        )}
+      </TouchableOpacity>
 
       {/* Bottom Navigation */}
       <View style={styles.bottomNav}>
@@ -489,6 +540,58 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#9CA3AF",
     textAlign: "center",
+  },
+  floatingMessageButton: {
+    position: "absolute",
+    right: 20,
+    bottom: 80,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#E5E7EB",
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.24,
+    shadowRadius: 12,
+    elevation: 10,
+    zIndex: 20,
+  },
+  floatingMessageIconWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  floatingMessageIconAccent: {
+    position: "absolute",
+    width: 13,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#1B73E8",
+    transform: [{ rotate: "-42deg" }],
+    top: 20,
+    left: 18,
+  },
+  floatingMessageBadge: {
+    position: "absolute",
+    top: -3,
+    right: -3,
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#EF4444",
+    borderWidth: 2,
+    borderColor: "#F3F4F6",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  floatingMessageBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "700",
   },
   bottomNav: {
     flexDirection: "row",

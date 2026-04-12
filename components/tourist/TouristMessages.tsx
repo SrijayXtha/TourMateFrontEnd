@@ -12,7 +12,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import { authAPI, guideAPI } from "../../constants/api";
+import { authAPI, touristAPI } from "../../constants/api";
 import {
     buildChatRoomId,
     deleteChatMessage,
@@ -24,8 +24,9 @@ import {
     subscribeToChatMessages,
     upsertChatRoom,
 } from "../../constants/firebase";
+import { TouristTopBar } from "../common/TouristTopBar";
 
-interface GuideMessagesProps {
+interface TouristMessagesProps {
   onBack: () => void;
 }
 
@@ -45,10 +46,10 @@ interface MessageItem {
   sentAt?: string;
 }
 
-interface GuideBookingContact {
+interface TouristBookingContact {
   bookingId: number;
-  touristId: number;
-  touristName: string;
+  guideId: number;
+  guideName: string;
   status: string;
   startDate?: string;
   endDate?: string;
@@ -67,8 +68,8 @@ interface ThreadMessage {
 
 interface ChatPreview {
   bookingId: number;
-  touristId: number;
-  touristName: string;
+  guideId: number;
+  guideName: string;
   previewText: string;
   previewAt?: string;
   unreadCount: number;
@@ -129,7 +130,7 @@ const initials = (name: string) => {
   return `${parts[0].slice(0, 1)}${parts[1].slice(0, 1)}`.toUpperCase();
 };
 
-export function GuideMessages({ onBack }: GuideMessagesProps) {
+export function TouristMessages({ onBack }: TouristMessagesProps) {
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<"list" | "thread">("list");
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
@@ -137,7 +138,7 @@ export function GuideMessages({ onBack }: GuideMessagesProps) {
   const [currentUserRole, setCurrentUserRole] = useState("");
   const [currentUserEmail, setCurrentUserEmail] = useState("");
   const [messages, setMessages] = useState<MessageItem[]>([]);
-  const [acceptedBookings, setAcceptedBookings] = useState<GuideBookingContact[]>([]);
+  const [acceptedBookings, setAcceptedBookings] = useState<TouristBookingContact[]>([]);
   const [selectedBookingId, setSelectedBookingId] = useState<number | null>(null);
   const [chatRoomId, setChatRoomId] = useState<string | null>(null);
   const [realtimeMessages, setRealtimeMessages] = useState<FirestoreMessage[]>([]);
@@ -153,7 +154,7 @@ export function GuideMessages({ onBack }: GuideMessagesProps) {
     [acceptedBookings, selectedBookingId]
   );
 
-  const activeReceiverId = selectedBooking?.touristId ?? null;
+  const activeReceiverId = selectedBooking?.guideId ?? null;
   const hasActiveThread =
     Boolean(currentUserId) &&
     Number.isInteger(activeReceiverId || 0) &&
@@ -165,8 +166,8 @@ export function GuideMessages({ onBack }: GuideMessagesProps) {
     try {
       const [user, messageResponse, bookingsResponse] = await Promise.all([
         authAPI.getCurrentUser(),
-        guideAPI.getMessages(),
-        guideAPI.getBookings(),
+        touristAPI.getMessages(),
+        touristAPI.getBookings(),
       ]);
 
       const appUserId = Number(user?.id || null);
@@ -193,35 +194,35 @@ export function GuideMessages({ onBack }: GuideMessagesProps) {
       const bookingContacts = rawBookings
         .map((booking) => {
           const bookingId = Number(booking?.id || booking?.bookingId || 0);
-          const touristId = Number(booking?.touristId || 0);
+          const guideId = Number(booking?.guide?.id || booking?.guideId || 0);
           const status = String(booking?.status || "").toLowerCase();
 
           return {
             bookingId,
-            touristId,
-            touristName: String(booking?.touristName || `Tourist #${touristId}`),
+            guideId,
+            guideName: String(booking?.guide?.name || booking?.guideName || `Guide #${guideId}`),
             status,
             startDate: booking?.startDate ? String(booking.startDate) : undefined,
             endDate: booking?.endDate ? String(booking.endDate) : undefined,
-          } satisfies GuideBookingContact;
+          } satisfies TouristBookingContact;
         })
         .filter(
           (item) =>
             Number.isInteger(item.bookingId) &&
             item.bookingId > 0 &&
-            Number.isInteger(item.touristId) &&
-            item.touristId > 0 &&
+            Number.isInteger(item.guideId) &&
+            item.guideId > 0 &&
             item.status === "confirmed"
         );
 
-      const uniqueByTourist = new Map<number, GuideBookingContact>();
+      const uniqueByGuide = new Map<number, TouristBookingContact>();
       bookingContacts.forEach((item) => {
-        if (!uniqueByTourist.has(item.touristId)) {
-          uniqueByTourist.set(item.touristId, item);
+        if (!uniqueByGuide.has(item.guideId)) {
+          uniqueByGuide.set(item.guideId, item);
         }
       });
 
-      const contacts = Array.from(uniqueByTourist.values());
+      const contacts = Array.from(uniqueByGuide.values());
       setAcceptedBookings(contacts);
 
       const hasCurrentSelection =
@@ -322,8 +323,8 @@ export function GuideMessages({ onBack }: GuideMessagesProps) {
             const senderId = Number(item.sender?.user_id || 0);
             const receiverId = Number(item.receiver?.user_id || 0);
             return (
-              (senderId === currentUserId && receiverId === booking.touristId) ||
-              (senderId === booking.touristId && receiverId === currentUserId)
+              (senderId === currentUserId && receiverId === booking.guideId) ||
+              (senderId === booking.guideId && receiverId === currentUserId)
             );
           })
           .sort((a, b) => toTimestamp(b.sentAt) - toTimestamp(a.sentAt));
@@ -336,8 +337,8 @@ export function GuideMessages({ onBack }: GuideMessagesProps) {
 
         return {
           bookingId: booking.bookingId,
-          touristId: booking.touristId,
-          touristName: booking.touristName,
+          guideId: booking.guideId,
+          guideName: booking.guideName,
           previewText: last?.content || "Tap to start chatting",
           previewAt: last?.sentAt,
           unreadCount: unread,
@@ -355,7 +356,7 @@ export function GuideMessages({ onBack }: GuideMessagesProps) {
 
   const sendMessage = async () => {
     if (!selectedBooking || !activeReceiverId || !currentUserId) {
-      Alert.alert("Chat Locked", "Chat unlocks only after booking acceptance.");
+      Alert.alert("Chat Locked", "Chat unlocks only after your booking is accepted.");
       return;
     }
 
@@ -389,7 +390,7 @@ export function GuideMessages({ onBack }: GuideMessagesProps) {
 
     setSending(true);
     try {
-      await guideAPI.sendMessage({
+      await touristAPI.sendMessage({
         bookingId: selectedBooking.bookingId,
         receiverId: activeReceiverId,
         content: content.trim(),
@@ -415,7 +416,7 @@ export function GuideMessages({ onBack }: GuideMessagesProps) {
           participantUserIds: [currentUserId, activeReceiverId],
           participantNames: {
             [String(currentUserId)]: currentUserName || `User #${currentUserId}`,
-            [String(activeReceiverId)]: selectedBooking.touristName,
+            [String(activeReceiverId)]: selectedBooking.guideName,
           },
           lastMessageText: content.trim(),
         });
@@ -433,7 +434,7 @@ export function GuideMessages({ onBack }: GuideMessagesProps) {
         setRealtimeStatus("pending");
         Alert.alert(
           "Realtime Pending",
-          "Message sent. Realtime sync starts after the tourist opens the updated app once."
+          "Message sent. Realtime sync starts after the guide opens the updated app once."
         );
       }
 
@@ -490,13 +491,13 @@ export function GuideMessages({ onBack }: GuideMessagesProps) {
     <TouchableOpacity style={styles.chatRow} onPress={() => openThread(item.bookingId)}>
       <View style={styles.avatarWrap}>
         <View style={styles.avatarCircle}>
-          <Text style={styles.avatarText}>{initials(item.touristName)}</Text>
+          <Text style={styles.avatarText}>{initials(item.guideName)}</Text>
         </View>
         <View style={styles.onlineDot} />
       </View>
 
       <View style={styles.chatBody}>
-        <Text style={styles.chatName}>{item.touristName}</Text>
+        <Text style={styles.chatName}>{item.guideName}</Text>
         <Text style={styles.chatPreview} numberOfLines={1}>
           {item.previewText}
         </Text>
@@ -536,13 +537,7 @@ export function GuideMessages({ onBack }: GuideMessagesProps) {
   if (viewMode === "list") {
     return (
       <View style={styles.screen}>
-        <View style={styles.listHeader}>
-          <TouchableOpacity onPress={onBack} style={styles.iconButton}>
-            <MaterialCommunityIcons name="arrow-left" size={22} color="#111827" />
-          </TouchableOpacity>
-          <Text style={styles.listTitle}>Chats</Text>
-          <View style={styles.iconButtonPlaceholder} />
-        </View>
+        <TouristTopBar title="Chats" subtitle="Connect with your guides" onBack={onBack} />
 
         {loading ? (
           <View style={styles.centerState}>
@@ -552,7 +547,7 @@ export function GuideMessages({ onBack }: GuideMessagesProps) {
           <View style={styles.centerState}>
             <MaterialCommunityIcons name="message-lock-outline" size={56} color="#9CA3AF" />
             <Text style={styles.emptyTitle}>No chats yet</Text>
-            <Text style={styles.emptySubtitle}>Chats unlock when bookings are confirmed.</Text>
+            <Text style={styles.emptySubtitle}>Chats unlock when a guide confirms your booking.</Text>
           </View>
         ) : (
           <FlatList
@@ -573,32 +568,15 @@ export function GuideMessages({ onBack }: GuideMessagesProps) {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={Platform.OS === "ios" ? 16 : 0}
     >
-      <View style={styles.threadHeader}>
-        <TouchableOpacity
-          onPress={() => {
-            setEditingMessageId(null);
-            setContent("");
-            setViewMode("list");
-          }}
-          style={styles.iconButton}
-        >
-          <MaterialCommunityIcons name="arrow-left" size={22} color="#111827" />
-        </TouchableOpacity>
-
-        <View style={styles.threadIdentity}>
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarText}>{initials(selectedBooking?.touristName || "Tourist")}</Text>
-          </View>
-          <View style={styles.threadIdentityTextWrap}>
-            <Text style={styles.threadName}>{selectedBooking?.touristName || "Tourist"}</Text>
-            <Text style={styles.threadMeta}>Booking #{selectedBooking?.bookingId || "-"}</Text>
-          </View>
-        </View>
-
-        <TouchableOpacity style={styles.iconButton}>
-          <MaterialCommunityIcons name="dots-vertical" size={20} color="#6B7280" />
-        </TouchableOpacity>
-      </View>
+      <TouristTopBar
+        title={selectedBooking?.guideName || "Guide Chat"}
+        subtitle={`Booking #${selectedBooking?.bookingId || "-"}`}
+        onBack={() => {
+          setEditingMessageId(null);
+          setContent("");
+          setViewMode("list");
+        }}
+      />
 
       <FlatList
         data={threadMessages}

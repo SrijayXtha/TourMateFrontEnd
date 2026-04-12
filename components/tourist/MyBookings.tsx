@@ -9,6 +9,7 @@ import {
     View,
 } from "react-native";
 import { touristAPI } from "../../constants/api";
+import { TouristTopBar } from "../common/TouristTopBar";
 
 interface MyBookingsProps {
   onBack: () => void;
@@ -171,14 +172,7 @@ export function MyBookings({ onBack }: MyBookingsProps) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
-          <Text style={styles.backText}>Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Bookings</Text>
-        <Text style={styles.headerSubtitle}>Manage your trips</Text>
-      </View>
+      <TouristTopBar title="My Bookings" subtitle="Manage your trips" onBack={onBack} />
 
       <View style={styles.tabsContainer}>
         <View style={styles.tabs}>

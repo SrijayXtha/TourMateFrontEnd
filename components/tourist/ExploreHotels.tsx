@@ -10,6 +10,7 @@ import {
     View,
 } from "react-native";
 import { mockHotels } from "../../data/mockData";
+import { TouristTopBar } from "../common/TouristTopBar";
 
 interface ExploreHotelsProps {
   onNavigate: (screen: string, data?: any) => void;
@@ -35,14 +36,11 @@ export function ExploreHotels({ onNavigate, onBack }: ExploreHotelsProps) {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
-          <Text style={styles.backButtonText}>Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Explore Hotels</Text>
-        <Text style={styles.headerSubtitle}>Find your perfect stay</Text>
-      </View>
+      <TouristTopBar
+        title="Explore Hotels"
+        subtitle="Find your perfect stay"
+        onBack={onBack}
+      />
 
       {/* Search & Filters */}
       <View style={styles.searchContainer}>

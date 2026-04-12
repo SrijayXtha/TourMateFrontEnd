@@ -1,5 +1,4 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import React, { useState } from "react";
 import {
     Image,
@@ -11,6 +10,7 @@ import {
     View,
 } from "react-native";
 import { mockGuides } from "../../data/mockData";
+import { TouristTopBar } from "../common/TouristTopBar";
 
 interface ExploreGuidesProps {
   onNavigate: (screen: string, data?: any) => void;
@@ -38,21 +38,11 @@ export function ExploreGuides({ onNavigate, onBack }: ExploreGuidesProps) {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <LinearGradient
-        colors={["#1B73E8", "#2BC7B2"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.header}
-      >
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#fff" />
-          <Text style={styles.backText}>Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Explore Guides</Text>
-        <Text style={styles.headerSubtitle}>
-          Find the perfect guide for your adventure
-        </Text>
-      </LinearGradient>
+      <TouristTopBar
+        title="Explore Guides"
+        subtitle="Find the perfect guide for your adventure"
+        onBack={onBack}
+      />
 
       {/* Search & Filters */}
       <View style={styles.searchContainer}>

@@ -1,4 +1,10 @@
 import axios from 'axios';
+import {
+    clearFirebaseSession,
+    ensureFirebaseSession,
+    registerChatPresence,
+    syncFirebaseAuthWithCredentials,
+} from './firebase';
 let AsyncStorage: any = null;
 
 // Lazy load AsyncStorage to avoid import errors if not installed
@@ -165,6 +171,63 @@ const setStoredGuideLocation = async (location?: string | null) => {
   }
 };
 
+const resolveUserProfile = (user: any) => {
+  const profile = user && typeof user === 'object' ? user : {};
+  const appUserId = Number(profile?.id ?? profile?.user_id);
+  const fullName = String(profile?.fullName ?? profile?.full_name ?? '').trim();
+  const role = String(profile?.role ?? '').trim();
+  const email = String(profile?.email ?? '').trim().toLowerCase();
+
+  return {
+    appUserId: Number.isInteger(appUserId) && appUserId > 0 ? appUserId : null,
+    fullName,
+    role,
+    email,
+  };
+};
+
+const registerRealtimePresenceForUser = async (user: any) => {
+  const profile = resolveUserProfile(user);
+  if (!profile.appUserId) {
+    return;
+  }
+
+  try {
+    await registerChatPresence({
+      appUserId: profile.appUserId,
+      fullName: profile.fullName,
+      role: profile.role,
+      email: profile.email,
+    });
+  } catch (error) {
+    console.warn('Unable to register realtime presence:', error);
+  }
+};
+
+const syncRealtimeIdentity = async (params?: {
+  email?: string;
+  password?: string;
+  fullName?: string;
+  user?: any;
+}) => {
+  try {
+    if (params?.email && params?.password) {
+      await syncFirebaseAuthWithCredentials({
+        email: params.email,
+        password: params.password,
+        fullName: params.fullName,
+      });
+    } else {
+      await ensureFirebaseSession();
+    }
+  } catch (error) {
+    console.warn('Unable to sync Firebase realtime identity:', error);
+  }
+
+  const userProfile = params?.user || (await TokenManager.getUser());
+  await registerRealtimePresenceForUser(userProfile);
+};
+
 // Add auth token to requests
 api.interceptors.request.use(
   async (config) => {
@@ -193,6 +256,12 @@ export const authAPI = {
     if (response.data.status === 'success' && response.data.data?.token) {
       await TokenManager.setToken(response.data.data.token);
       await TokenManager.setUser(response.data.data.user);
+      await syncRealtimeIdentity({
+        email: userData.email,
+        password: userData.password,
+        fullName: userData.fullName,
+        user: response.data.data.user,
+      });
     }
     return response.data;
   },
@@ -203,6 +272,12 @@ export const authAPI = {
     if (response.data.status === 'success' && response.data.data?.token) {
       await TokenManager.setToken(response.data.data.token);
       await TokenManager.setUser(response.data.data.user);
+      await syncRealtimeIdentity({
+        email: credentials.email,
+        password: credentials.password,
+        fullName: response.data.data.user?.fullName,
+        user: response.data.data.user,
+      });
     }
     return response.data;
   },
@@ -213,16 +288,23 @@ export const authAPI = {
     if (response.data.status === 'success' && response.data.data?.token) {
       await TokenManager.setToken(response.data.data.token);
       await TokenManager.setUser(response.data.data.user);
+      await syncRealtimeIdentity({
+        fullName: response.data.data.user?.fullName,
+        user: response.data.data.user,
+      });
     }
     return response.data;
   },
 
   logout: async () => {
+    await clearFirebaseSession();
     await TokenManager.logout();
   },
 
   getCurrentUser: async () => {
-    return await TokenManager.getUser();
+    const user = await TokenManager.getUser();
+    await syncRealtimeIdentity({ user });
+    return user;
   },
 
   isAuthenticated: async () => {
@@ -375,6 +457,18 @@ export const touristAPI = {
     return response.data;
   },
 
+  getMessages: async (bookingId?: number) => {
+    const response = await api.get('/tourist/messages', {
+      params: bookingId ? { bookingId } : undefined,
+    });
+    return response.data;
+  },
+
+  sendMessage: async (payload: { receiverId?: number; bookingId?: number; content: string }) => {
+    const response = await api.post('/tourist/messages', payload);
+    return response.data;
+  },
+
   getReviews: async () => {
     const response = await api.get('/tourist/reviews');
     return response.data;
@@ -476,7 +570,7 @@ export const guideAPI = {
     return response.data;
   },
 
-  sendMessage: async (payload: { receiverId: number; content: string }) => {
+  sendMessage: async (payload: { receiverId?: number; bookingId?: number; content: string }) => {
     const response = await api.post('/guide/messages', payload);
     return response.data;
   },
@@ -1197,6 +1291,7 @@ const mapGuideBooking = (booking: DemoBooking) => {
   const tourist = getDemoUserById(booking.touristId);
   return {
     id: booking.id,
+    touristId: tourist?.id,
     touristName: tourist?.fullName || 'Tourist',
     touristPhone: tourist?.phone,
     startDate: booking.startDate,
@@ -1320,7 +1415,14 @@ if (IS_DEMO_MODE) {
     });
 
     addDemoActivity('user_registered', `${user.fullName} registered as ${role}.`, user.fullName);
-    return demoAuthSuccess('User registered successfully (demo)', user);
+    const authResponse = await demoAuthSuccess('User registered successfully (demo)', user);
+    await syncRealtimeIdentity({
+      email: userData.email,
+      password: userData.password,
+      fullName: user.fullName,
+      user: authResponse?.data?.user,
+    });
+    return authResponse;
   };
 
   authAPI.login = async (credentials) => {
@@ -1335,7 +1437,14 @@ if (IS_DEMO_MODE) {
       });
     }
 
-    return demoAuthSuccess('Login successful (demo)', user);
+    const authResponse = await demoAuthSuccess('Login successful (demo)', user);
+    await syncRealtimeIdentity({
+      email: credentials.email,
+      password: credentials.password,
+      fullName: user.fullName,
+      user: authResponse?.data?.user,
+    });
+    return authResponse;
   };
 
   authAPI.googleLogin = async (payload) => {
@@ -1351,7 +1460,12 @@ if (IS_DEMO_MODE) {
       });
     }
 
-    return demoAuthSuccess('Google login successful (demo)', user);
+    const authResponse = await demoAuthSuccess('Google login successful (demo)', user);
+    await syncRealtimeIdentity({
+      fullName: user.fullName,
+      user: authResponse?.data?.user,
+    });
+    return authResponse;
   };
 
   touristAPI.getProfile = async () => {
@@ -1659,6 +1773,159 @@ if (IS_DEMO_MODE) {
     );
 
     return demoSuccess('Notification deleted (demo)');
+  };
+
+  touristAPI.getMessages = async (bookingId) => {
+    const user = await getCurrentDemoUserRecord();
+    const parsedBookingId = Number.parseInt(String(bookingId ?? ''), 10);
+
+    let allowedGuideIds: number[] = [];
+
+    if (Number.isInteger(parsedBookingId) && parsedBookingId > 0) {
+      const booking = demoBookings.find(
+        (item) =>
+          item.id === parsedBookingId &&
+          item.touristId === user.id &&
+          item.status === 'confirmed' &&
+          Boolean(item.guideId)
+      );
+
+      if (!booking?.guideId) {
+        return demoSuccess('Messages retrieved (demo)', {
+          count: 0,
+          messages: [],
+        });
+      }
+
+      allowedGuideIds = [booking.guideId];
+    } else {
+      allowedGuideIds = Array.from(
+        new Set(
+          demoBookings
+            .filter(
+              (item) =>
+                item.touristId === user.id &&
+                item.status === 'confirmed' &&
+                Number.isInteger(item.guideId)
+            )
+            .map((item) => item.guideId as number)
+        )
+      );
+    }
+
+    const messages = demoMessages
+      .filter((message) => {
+        const senderId = Number(message.senderId || 0);
+        const receiverId = Number(message.receiverId || 0);
+        return (
+          (senderId === user.id && allowedGuideIds.includes(receiverId)) ||
+          (receiverId === user.id && allowedGuideIds.includes(senderId))
+        );
+      })
+      .sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime())
+      .map((message) => ({
+        id: message.id,
+        sender: (() => {
+          const sender = getDemoUserById(message.senderId);
+          return sender
+            ? {
+                user_id: sender.id,
+                full_name: sender.fullName,
+                role: sender.role,
+              }
+            : undefined;
+        })(),
+        receiver: (() => {
+          const receiver = getDemoUserById(message.receiverId);
+          return receiver
+            ? {
+                user_id: receiver.id,
+                full_name: receiver.fullName,
+                role: receiver.role,
+              }
+            : undefined;
+        })(),
+        content: message.content,
+        isRead: message.isRead,
+        sentAt: message.sentAt,
+      }));
+
+    return demoSuccess('Messages retrieved (demo)', {
+      count: messages.length,
+      messages,
+    });
+  };
+
+  touristAPI.sendMessage = async (payload) => {
+    const user = await getCurrentDemoUserRecord();
+
+    if (!payload.content || !payload.content.trim()) {
+      throw { message: 'Message content is required', status: 400 };
+    }
+
+    const bookingId = Number.parseInt(String(payload.bookingId ?? ''), 10);
+    let resolvedReceiverId = Number.parseInt(String(payload.receiverId ?? ''), 10);
+
+    if (Number.isInteger(bookingId) && bookingId > 0) {
+      const confirmedBooking = demoBookings.find(
+        (item) =>
+          item.id === bookingId &&
+          item.touristId === user.id &&
+          item.status === 'confirmed' &&
+          Boolean(item.guideId)
+      );
+
+      if (!confirmedBooking?.guideId) {
+        throw { message: 'Chat is enabled only after booking is accepted', status: 403 };
+      }
+
+      resolvedReceiverId = confirmedBooking.guideId;
+    }
+
+    if (!Number.isInteger(resolvedReceiverId) || resolvedReceiverId <= 0) {
+      throw { message: 'bookingId or receiverId is required', status: 400 };
+    }
+
+    const hasConfirmedBooking = demoBookings.some(
+      (item) =>
+        item.touristId === user.id &&
+        item.guideId === resolvedReceiverId &&
+        item.status === 'confirmed'
+    );
+
+    if (!hasConfirmedBooking) {
+      throw { message: 'Chat is enabled only after booking is accepted', status: 403 };
+    }
+
+    const receiver = getDemoUserById(resolvedReceiverId);
+    if (!receiver) {
+      throw { message: 'Receiver not found', status: 404 };
+    }
+
+    demoMessageSeq += 1;
+    const message = {
+      id: demoMessageSeq,
+      senderId: user.id,
+      receiverId: resolvedReceiverId,
+      content: payload.content.trim(),
+      isRead: false,
+      sentAt: new Date().toISOString(),
+    };
+    demoMessages.unshift(message);
+
+    addDemoNotification(
+      receiver.id,
+      'New message',
+      `You received a new message from ${user.fullName}.`,
+      'message',
+      false
+    );
+
+    return demoSuccess('Message sent (demo)', {
+      messageId: message.id,
+      sentAt: message.sentAt,
+      receiverId: resolvedReceiverId,
+    });
   };
 
   touristAPI.getReviews = async () => {
@@ -2008,7 +2275,37 @@ if (IS_DEMO_MODE) {
 
   guideAPI.sendMessage = async (payload) => {
     const user = await getCurrentDemoUserRecord();
-    const receiver = getDemoUserById(payload.receiverId);
+    const bookingId = Number.parseInt(String(payload.bookingId ?? ''), 10);
+    let resolvedReceiverId = Number.parseInt(String(payload.receiverId ?? ''), 10);
+
+    if (Number.isInteger(bookingId) && bookingId > 0) {
+      const confirmedBooking = demoBookings.find(
+        (item) => item.id === bookingId && item.guideId === user.id && item.status === 'confirmed'
+      );
+
+      if (!confirmedBooking?.touristId) {
+        throw { message: 'Chat is enabled only after booking is accepted', status: 403 };
+      }
+
+      resolvedReceiverId = confirmedBooking.touristId;
+    }
+
+    if (!Number.isInteger(resolvedReceiverId) || resolvedReceiverId <= 0) {
+      throw { message: 'bookingId or receiverId is required', status: 400 };
+    }
+
+    const hasConfirmedBooking = demoBookings.some(
+      (item) =>
+        item.guideId === user.id &&
+        item.touristId === resolvedReceiverId &&
+        item.status === 'confirmed'
+    );
+
+    if (!hasConfirmedBooking) {
+      throw { message: 'Chat is enabled only after booking is accepted', status: 403 };
+    }
+
+    const receiver = getDemoUserById(resolvedReceiverId);
     if (!receiver) {
       throw { message: 'Receiver not found', status: 404 };
     }
@@ -2017,7 +2314,7 @@ if (IS_DEMO_MODE) {
     const message = {
       id: demoMessageSeq,
       senderId: user.id,
-      receiverId: receiver.id,
+      receiverId: resolvedReceiverId,
       content: payload.content.trim(),
       isRead: false,
       sentAt: new Date().toISOString(),
@@ -2035,6 +2332,7 @@ if (IS_DEMO_MODE) {
     return demoSuccess('Message sent (demo)', {
       messageId: message.id,
       sentAt: message.sentAt,
+      receiverId: resolvedReceiverId,
     });
   };
 

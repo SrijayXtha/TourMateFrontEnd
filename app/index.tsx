@@ -33,6 +33,7 @@ import { IncidentReport } from "@/components/tourist/IncidentReport";
 import { MyBookings } from "@/components/tourist/MyBookings";
 import { SOSScreen } from "@/components/tourist/SOSScreen";
 import { TouristHome } from "@/components/tourist/TouristHome";
+import { TouristMessages } from "@/components/tourist/TouristMessages";
 import { TouristNotifications } from "@/components/tourist/TouristNotifications";
 import { TouristProfile } from "@/components/tourist/TouristProfile";
 import { TouristSettings } from "@/components/tourist/TouristSettings";
@@ -56,7 +57,8 @@ type TouristScreen =
   | "destination-details"
   | "hotel-details"
   | "my-bookings"
-  | "sos";
+  | "sos"
+  | "messages";
 type GuideScreen =
   | "home"
   | "settings"
@@ -276,6 +278,7 @@ export default function Index() {
         <GuideProfile
           guide={selectedGuide}
           onBack={() => setTouristScreen(previousScreen)}
+          onMessage={() => setTouristScreen("messages")}
           onBook={async (startDate, endDate) => {
             const guideId = parseEntityId(selectedGuide?.id);
             if (!guideId) {
@@ -392,6 +395,10 @@ export default function Index() {
       );
     }
 
+    if (touristScreen === "messages") {
+      return <TouristMessages onBack={() => setTouristScreen("home")} />;
+    }
+
     return (
       <TouristHome
         onNavigate={(screen, data) => {
@@ -417,6 +424,8 @@ export default function Index() {
             setTouristScreen("my-bookings");
           } else if (screen === "sos") {
             setTouristScreen("sos");
+          } else if (screen === "messages") {
+            setTouristScreen("messages");
           }
         }}
       />

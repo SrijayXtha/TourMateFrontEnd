@@ -10,6 +10,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { TouristTopBar } from '../common/TouristTopBar';
 
 interface IncidentReportProps {
   onBack: () => void;
@@ -57,19 +58,11 @@ export function IncidentReport({ onBack, onSubmit }: IncidentReportProps) {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <LinearGradient
-        colors={['#F97316', '#EA580C']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.header}
-      >
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
-          <Text style={styles.backText}>Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Report Incident</Text>
-        <Text style={styles.headerSubtitle}>Help us improve safety for everyone</Text>
-      </LinearGradient>
+      <TouristTopBar
+        title="Report Incident"
+        subtitle="Help us improve safety for everyone"
+        onBack={onBack}
+      />
 
       {/* Form */}
       <ScrollView

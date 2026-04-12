@@ -9,6 +9,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { TouristTopBar } from "../common/TouristTopBar";
 
 interface SOSScreenProps {
   onBack: () => void;
@@ -98,14 +99,7 @@ export function SOSScreen({ onBack, onSendSOS }: SOSScreenProps) {
     <View style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={onBack} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
-            <Text style={styles.backText}>Back</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>SOS Emergency</Text>
-          <Text style={styles.headerSubtitle}>Get immediate help</Text>
-        </View>
+        <TouristTopBar title="SOS Emergency" subtitle="Get immediate help" onBack={onBack} />
 
         {/* SOS Button */}
         <View style={styles.sosSection}>

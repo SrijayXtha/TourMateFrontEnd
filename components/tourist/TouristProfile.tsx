@@ -8,6 +8,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { TouristTopBar } from "../common/TouristTopBar";
 
 interface TouristProfileProps {
   onLogout: () => void;
@@ -60,14 +61,12 @@ export function TouristProfile({ onLogout, onBack, onNavigate }: TouristProfileP
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
-          <Text style={styles.backText}>Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Profile</Text>
-        <Text style={styles.headerSubtitle}>Manage your account</Text>
-      </View>
+      <TouristTopBar
+        title="Profile"
+        subtitle="Manage your account"
+        onBack={onBack}
+        containerStyle={{ paddingBottom: 64 }}
+      />
 
       {/* Profile Card */}
       <View style={styles.profileCardContainer}>
