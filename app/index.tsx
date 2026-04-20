@@ -33,6 +33,7 @@ import { IncidentReport } from "@/components/tourist/IncidentReport";
 import { MyBookings } from "@/components/tourist/MyBookings";
 import { SOSScreen } from "@/components/tourist/SOSScreen";
 import { TouristHome } from "@/components/tourist/TouristHome";
+import { TouristMap } from "@/components/tourist/TouristMap";
 import { TouristMessages } from "@/components/tourist/TouristMessages";
 import { TouristNotifications } from "@/components/tourist/TouristNotifications";
 import { TouristProfile } from "@/components/tourist/TouristProfile";
@@ -58,7 +59,8 @@ type TouristScreen =
   | "hotel-details"
   | "my-bookings"
   | "sos"
-  | "messages";
+  | "messages"
+  | "map";
 type GuideScreen =
   | "home"
   | "settings"
@@ -399,6 +401,25 @@ export default function Index() {
       return <TouristMessages onBack={() => setTouristScreen("home")} />;
     }
 
+    if (touristScreen === "map") {
+      return (
+        <TouristMap
+          onBack={() => setTouristScreen("home")}
+          onNavigate={(screen, data) => {
+            if (screen === "guide-profile") {
+              setSelectedGuide(data);
+              setPreviousScreen("map");
+              setTouristScreen("guide-profile");
+            } else if (screen === "hotel-details") {
+              setSelectedHotel(data);
+              setPreviousScreen("map");
+              setTouristScreen("hotel-details");
+            }
+          }}
+        />
+      );
+    }
+
     return (
       <TouristHome
         onNavigate={(screen, data) => {
@@ -426,6 +447,8 @@ export default function Index() {
             setTouristScreen("sos");
           } else if (screen === "messages") {
             setTouristScreen("messages");
+          } else if (screen === "map") {
+            setTouristScreen("map");
           }
         }}
       />

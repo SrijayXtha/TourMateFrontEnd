@@ -270,7 +270,10 @@ export function TouristHome({ onNavigate }: TouristHomeProps) {
 
         <TouchableOpacity
           style={styles.navItem}
-          onPress={() => setActiveTab("map")}
+          onPress={() => {
+            setActiveTab("map");
+            onNavigate("map");
+          }}
         >
           <MaterialCommunityIcons
             name="map"
