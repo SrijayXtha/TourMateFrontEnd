@@ -18,7 +18,6 @@ interface TouristHomeProps {
 }
 
 export function TouristHome({ onNavigate }: TouristHomeProps) {
-  const [activeTab, setActiveTab] = useState("home");
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
 
   const loadUnreadMessageCount = useCallback(async () => {
@@ -228,87 +227,6 @@ export function TouristHome({ onNavigate }: TouristHomeProps) {
         )}
       </TouchableOpacity>
 
-      {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => setActiveTab("home")}
-        >
-          <MaterialCommunityIcons
-            name="home"
-            size={24}
-            color={activeTab === "home" ? "#1B73E8" : "#9CA3AF"}
-          />
-          <Text
-            style={[
-              styles.navLabel,
-              activeTab === "home" && styles.navLabelActive,
-            ]}
-          >
-            Home
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => onNavigate("explore")}
-        >
-          <MaterialCommunityIcons
-            name="compass"
-            size={24}
-            color={activeTab === "explore" ? "#1B73E8" : "#9CA3AF"}
-          />
-          <Text
-            style={[
-              styles.navLabel,
-              activeTab === "explore" && styles.navLabelActive,
-            ]}
-          >
-            Explore
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => {
-            setActiveTab("map");
-            onNavigate("map");
-          }}
-        >
-          <MaterialCommunityIcons
-            name="map"
-            size={24}
-            color={activeTab === "map" ? "#1B73E8" : "#9CA3AF"}
-          />
-          <Text
-            style={[
-              styles.navLabel,
-              activeTab === "map" && styles.navLabelActive,
-            ]}
-          >
-            Map
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => onNavigate("profile")}
-        >
-          <MaterialCommunityIcons
-            name="account"
-            size={24}
-            color={activeTab === "profile" ? "#1B73E8" : "#9CA3AF"}
-          />
-          <Text
-            style={[
-              styles.navLabel,
-              activeTab === "profile" && styles.navLabelActive,
-            ]}
-          >
-            Profile
-          </Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 }
@@ -547,7 +465,7 @@ const styles = StyleSheet.create({
   floatingMessageButton: {
     position: "absolute",
     right: 20,
-    bottom: 80,
+    bottom: 24,
     width: 56,
     height: 56,
     borderRadius: 28,
@@ -595,32 +513,5 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 10,
     fontWeight: "700",
-  },
-  bottomNav: {
-    flexDirection: "row",
-    backgroundColor: "#FFFFFF",
-    borderTopWidth: 1,
-    borderTopColor: "#E5E7EB",
-    paddingBottom: 8,
-    elevation: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-  },
-  navItem: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingTop: 8,
-  },
-  navLabel: {
-    fontSize: 10,
-    color: "#9CA3AF",
-    marginTop: 4,
-  },
-  navLabelActive: {
-    color: "#1B73E8",
-    fontWeight: "600",
   },
 });

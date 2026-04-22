@@ -9,6 +9,7 @@ import { VerifyHotels } from "@/components/admin/VerifyHotels";
 import { LoginScreen } from "@/components/auth/LoginScreen";
 import { RegisterScreen } from "@/components/auth/RegisterScreen";
 import { SplashScreen } from "@/components/auth/SplashScreen";
+import { TouristBottomBar, TouristBottomTab } from "@/components/common/TouristBottomBar";
 import { GuideAnalytics } from "@/components/guide/GuideAnalytics";
 import { GuideBookings } from "@/components/guide/GuideBookings";
 import { GuideHome } from "@/components/guide/GuideHome";
@@ -40,7 +41,7 @@ import { TouristProfile } from "@/components/tourist/TouristProfile";
 import { TouristSettings } from "@/components/tourist/TouristSettings";
 import { authAPI, touristAPI } from "@/constants/api";
 import { useEffect, useState } from "react";
-import { Alert } from "react-native";
+import { Alert, StyleSheet, View } from "react-native";
 
 type AuthScreen = "login" | "register";
 type UserRole = "tourist" | "guide" | "hotel" | "admin" | null;
@@ -79,6 +80,45 @@ type AdminScreen =
   | "manage-bookings"
   | "analytics"
   | "activity-logs";
+
+const getTouristBottomTab = (
+  screen: TouristScreen,
+  previousScreen: TouristScreen
+): TouristBottomTab => {
+  if (screen === "map") {
+    return "map";
+  }
+
+  if (screen === "profile" || screen === "settings" || screen === "notifications") {
+    return "profile";
+  }
+
+  if (
+    screen === "explore" ||
+    screen === "explore-guides" ||
+    screen === "explore-hotels" ||
+    screen === "destination-details"
+  ) {
+    return "explore";
+  }
+
+  if (screen === "guide-profile" || screen === "hotel-details") {
+    if (previousScreen === "map") {
+      return "map";
+    }
+
+    if (
+      previousScreen === "explore" ||
+      previousScreen === "explore-guides" ||
+      previousScreen === "explore-hotels" ||
+      previousScreen === "destination-details"
+    ) {
+      return "explore";
+    }
+  }
+
+  return "home";
+};
 
 export default function Index() {
   const [showSplash, setShowSplash] = useState(true);
@@ -177,8 +217,18 @@ export default function Index() {
   }
 
   if (userRole === "tourist") {
+    const renderTouristPage = (content: JSX.Element) => (
+      <View style={styles.touristLayout}>
+        <View style={styles.touristContent}>{content}</View>
+        <TouristBottomBar
+          activeTab={getTouristBottomTab(touristScreen, previousScreen)}
+          onNavigate={(tab) => setTouristScreen(tab)}
+        />
+      </View>
+    );
+
     if (touristScreen === "explore") {
-      return (
+      return renderTouristPage(
         <Explore
           onNavigate={(screen, data) => {
             if (screen === "destination-details") {
@@ -201,7 +251,7 @@ export default function Index() {
     }
 
     if (touristScreen === "destination-details" && selectedDestination) {
-      return (
+      return renderTouristPage(
         <DestinationDetails
           destination={selectedDestination}
           onBack={() => setTouristScreen("explore")}
@@ -221,7 +271,7 @@ export default function Index() {
     }
 
     if (touristScreen === "hotel-details" && selectedHotel) {
-      return (
+      return renderTouristPage(
         <HotelDetails
           hotel={selectedHotel}
           onBack={() => setTouristScreen(previousScreen)}
@@ -261,7 +311,7 @@ export default function Index() {
     }
 
     if (touristScreen === "explore-guides") {
-      return (
+      return renderTouristPage(
         <ExploreGuides
           onNavigate={(screen, data) => {
             if (screen === "guide-profile") {
@@ -276,7 +326,7 @@ export default function Index() {
     }
 
     if (touristScreen === "guide-profile" && selectedGuide) {
-      return (
+      return renderTouristPage(
         <GuideProfile
           guide={selectedGuide}
           onBack={() => setTouristScreen(previousScreen)}
@@ -310,7 +360,7 @@ export default function Index() {
     }
 
     if (touristScreen === "explore-hotels") {
-      return (
+      return renderTouristPage(
         <ExploreHotels
           onNavigate={(screen, data) => {
             if (screen === "hotel-details") {
@@ -325,7 +375,7 @@ export default function Index() {
     }
 
     if (touristScreen === "profile") {
-      return (
+      return renderTouristPage(
         <TouristProfile
           onLogout={() => void handleLogout()}
           onBack={() => setTouristScreen("home")}
@@ -343,23 +393,19 @@ export default function Index() {
     }
 
     if (touristScreen === "settings") {
-      return <TouristSettings onBack={() => setTouristScreen("profile")} />;
+      return renderTouristPage(<TouristSettings onBack={() => setTouristScreen("profile")} />);
     }
 
     if (touristScreen === "notifications") {
-      return <TouristNotifications onBack={() => setTouristScreen("profile")} />;
+      return renderTouristPage(<TouristNotifications onBack={() => setTouristScreen("profile")} />);
     }
 
     if (touristScreen === "emergency-contacts") {
-      return (
-        <EmergencyContacts
-          onBack={() => setTouristScreen("home")}
-        />
-      );
+      return renderTouristPage(<EmergencyContacts onBack={() => setTouristScreen("home")} />);
     }
 
     if (touristScreen === "report-incident") {
-      return (
+      return renderTouristPage(
         <IncidentReport
           onBack={() => setTouristScreen("home")}
           onSubmit={async (payload) => {
@@ -379,15 +425,11 @@ export default function Index() {
     }
 
     if (touristScreen === "my-bookings") {
-      return (
-        <MyBookings
-          onBack={() => setTouristScreen("home")}
-        />
-      );
+      return renderTouristPage(<MyBookings onBack={() => setTouristScreen("home")} />);
     }
 
     if (touristScreen === "sos") {
-      return (
+      return renderTouristPage(
         <SOSScreen
           onBack={() => setTouristScreen("home")}
           onSendSOS={async (payload) => {
@@ -398,11 +440,11 @@ export default function Index() {
     }
 
     if (touristScreen === "messages") {
-      return <TouristMessages onBack={() => setTouristScreen("home")} />;
+      return renderTouristPage(<TouristMessages onBack={() => setTouristScreen("home")} />);
     }
 
     if (touristScreen === "map") {
-      return (
+      return renderTouristPage(
         <TouristMap
           onBack={() => setTouristScreen("home")}
           onNavigate={(screen, data) => {
@@ -420,7 +462,7 @@ export default function Index() {
       );
     }
 
-    return (
+    return renderTouristPage(
       <TouristHome
         onNavigate={(screen, data) => {
           if (screen === "explore" || screen === "explore-guides") {
@@ -592,4 +634,14 @@ export default function Index() {
 
   return null;
 }
+
+const styles = StyleSheet.create({
+  touristLayout: {
+    flex: 1,
+    backgroundColor: "#F3F4F6",
+  },
+  touristContent: {
+    flex: 1,
+  },
+});
 
