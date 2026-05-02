@@ -1,50 +1,85 @@
-# Welcome to your Expo app 👋
+# TourMate — Frontend
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+> Final Year Project · 6CS007 Project & Professionalism  
+> BSc (Hons) Computer Science · Herald College Kathmandu (University of Wolverhampton)
 
-## Get started
+A cross-platform mobile app for tourists in Nepal that combines verified guide booking, hotel reservations, and real-time safety tools — all in one platform.
 
-1. Install dependencies
+---
 
-   ```bash
-   npm install
-   ```
+## Screenshots
 
-2. Start the app
+> _Add screenshots of your app screens here once available_
 
-   ```bash
-   npx expo start
-   ```
+---
 
-In the output, you'll find options to open the app in a
+## Features
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+- 🔐 **Authentication** — sign up and login for Tourists, Guides, Hotels, and Admins
+- 🔍 **Guide Search & Profiles** — browse verified guides, view ratings, experience, and pricing
+- 📅 **Booking Flow** — book guides or hotels separately or as bundled packages
+- 🗺 **Interactive Maps** — OpenStreetMap integration for live location, guide meeting points, and incident tagging
+- 🚨 **SOS Emergency Button** — one-tap alert with live location sharing
+- 📋 **Incident Reporting** — submit reports with photo, description, and location
+- 🧳 **Trip Customisation** — select itinerary, destinations, trip length, and activities
+- 📊 **Tourist Dashboard** — manage bookings, reports, trips, and emergency contacts
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+---
 
-## Get a fresh project
+## Tech Stack
 
-When you're ready, run:
+| Layer | Technology |
+|---|---|
+| Framework | React Native |
+| Language | JavaScript (ES6+) |
+| Navigation | React Navigation |
+| Maps | OpenStreetMap API |
+| API Communication | Axios |
+| Authentication | JWT (JSON Web Tokens) |
+| State Management | Context API / Redux |
+| Version Control | Git + GitHub |
+| Project Management | Trello (Agile sprints) |
 
-```bash
-npm run reset-project
+---
+
+## Project Structure
+
+```
+src/
+├── components/       # Reusable UI components
+├── screens/          # All app screens (auth, booking, dashboard, SOS, etc.)
+├── navigation/       # React Navigation stack and tab config
+├── hooks/            # Custom React hooks
+├── services/         # API call functions (Axios)
+└── utils/            # Helper functions
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+---
 
-## Learn more
+## Getting Started
 
-To learn more about developing your project with Expo, look at the following resources:
+```bash
+# Clone the repo
+git clone https://github.com/yourusername/tourmate-frontend.git
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+# Install dependencies
+cd tourmate-frontend
+npm install
 
-## Join the community
+# Start the app
+npx expo start
+```
 
-Join our community of developers creating universal apps.
+> Requires Node.js and Expo CLI installed. Connect a physical device or use an emulator.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+---
+
+## Related
+
+- 🔗 Backend repo: [TourMate Backend](https://github.com/SrijayXtha/TourMateBackend)
+
+---
+
+## Status
+
+🚧 Active development — Final Year Project 2025/26
