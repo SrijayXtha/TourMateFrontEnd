@@ -4,6 +4,7 @@ import {
     Alert,
     Image,
     ScrollView,
+    Share,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -96,30 +97,54 @@ export function HotelDetails({ hotel, onBack, onBook }: HotelDetailsProps) {
     );
   };
 
+  const handleShareProfile = async () => {
+    const shareLink = `https://tourmate.app/hotel/${encodeURIComponent(String(hotel.id))}`;
+    await Share.share({
+      message: `Check out ${hotel.name} on TourMate: ${shareLink}`,
+      url: shareLink,
+      title: `${hotel.name} - TourMate`,
+    });
+  };
+
   return (
     <View style={styles.container}>
       <TouristTopBar title={hotel.name} subtitle={hotel.location} onBack={onBack} />
-
-      {/* Header Image */}
-      <View style={styles.imageContainer}>
-        <Image
-          source={{ uri: hotel.image }}
-          style={styles.headerImage}
-          resizeMode="cover"
-        />
-        {hotel.verified && (
-          <View style={styles.verifiedBadge}>
-            <MaterialCommunityIcons name="check-circle" size={16} color="#fff" />
-            <Text style={styles.verifiedText}>Verified</Text>
-          </View>
-        )}
-      </View>
 
       {/* Content */}
       <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
       >
+        <View style={styles.compactProfileCard}>
+          <Image source={{ uri: hotel.image }} style={styles.compactProfileImage} />
+          <View style={styles.compactProfileInfo}>
+            <Text style={styles.compactProfileName}>{hotel.name}</Text>
+            <View style={styles.compactMetaRow}>
+              <MaterialCommunityIcons name="star" size={13} color="#FFC107" />
+              <Text style={styles.compactMetaText}>{hotel.rating}</Text>
+              <Text style={styles.compactMetaDot}>•</Text>
+              <Text style={styles.compactMetaText}>{hotel.location}</Text>
+            </View>
+          </View>
+          {hotel.verified ? (
+            <MaterialCommunityIcons name="check-circle" size={18} color="#2BC7B2" />
+          ) : null}
+        </View>
+
+        {/* Header Image */}
+        <View style={styles.imageContainer}>
+          <Image
+            source={{ uri: hotel.image }}
+            style={styles.headerImage}
+            resizeMode="cover"
+          />
+          {hotel.verified && (
+            <View style={styles.verifiedBadge}>
+              <MaterialCommunityIcons name="check-circle" size={16} color="#fff" />
+              <Text style={styles.verifiedText}>Verified</Text>
+            </View>
+          )}
+        </View>
         <View style={styles.contentPadding}>
           {/* Title & Rating */}
           <View style={styles.section}>
@@ -279,6 +304,10 @@ export function HotelDetails({ hotel, onBack, onBook }: HotelDetailsProps) {
           <Text style={styles.footerPriceValue}>{hotel.pricePerNight}</Text>
           <Text style={styles.footerPriceLabel}>/night</Text>
         </View>
+        <TouchableOpacity style={styles.shareButton} onPress={() => void handleShareProfile()}>
+          <MaterialCommunityIcons name="share-variant-outline" size={16} color="#1B73E8" />
+          <Text style={styles.shareButtonText}>Share Profile</Text>
+        </TouchableOpacity>
         <TouchableOpacity
           style={[
             styles.bookButton,
@@ -344,6 +373,49 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  compactProfileCard: {
+    marginTop: 12,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  compactProfileImage: {
+    width: 54,
+    height: 54,
+    borderRadius: 10,
+  },
+  compactProfileInfo: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  compactProfileName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 3,
+  },
+  compactMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  compactMetaText: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  compactMetaDot: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginHorizontal: 2,
   },
   contentPadding: {
     padding: 24,
@@ -589,5 +661,21 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  shareButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#93C5FD',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#EFF6FF',
+  },
+  shareButtonText: {
+    color: '#1B73E8',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

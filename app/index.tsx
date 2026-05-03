@@ -126,6 +126,7 @@ export default function Index() {
   const [authScreen, setAuthScreen] = useState<AuthScreen>("login");
   const [userRole, setUserRole] = useState<UserRole>(null);
   const [touristScreen, setTouristScreen] = useState<TouristScreen>("home");
+  const [touristSettingsTab, setTouristSettingsTab] = useState<"profile" | "payment" | "saved" | "privacy">("profile");
   const [guideScreen, setGuideScreen] = useState<GuideScreen>("home");
   const [hotelScreen, setHotelScreen] = useState<HotelScreen>("home");
   const [adminScreen, setAdminScreen] = useState<AdminScreen>("dashboard");
@@ -381,6 +382,19 @@ export default function Index() {
           onBack={() => setTouristScreen("home")}
           onNavigate={(screen) => {
             if (screen === "settings") {
+              setTouristSettingsTab("profile");
+              setTouristScreen("settings");
+            } else if (screen === "settings-profile") {
+              setTouristSettingsTab("profile");
+              setTouristScreen("settings");
+            } else if (screen === "settings-payment") {
+              setTouristSettingsTab("payment");
+              setTouristScreen("settings");
+            } else if (screen === "settings-saved") {
+              setTouristSettingsTab("saved");
+              setTouristScreen("settings");
+            } else if (screen === "settings-privacy") {
+              setTouristSettingsTab("privacy");
               setTouristScreen("settings");
             }
 
@@ -393,7 +407,12 @@ export default function Index() {
     }
 
     if (touristScreen === "settings") {
-      return renderTouristPage(<TouristSettings onBack={() => setTouristScreen("profile")} />);
+      return renderTouristPage(
+        <TouristSettings
+          initialTab={touristSettingsTab}
+          onBack={() => setTouristScreen("profile")}
+        />
+      );
     }
 
     if (touristScreen === "notifications") {
@@ -644,4 +663,3 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
-

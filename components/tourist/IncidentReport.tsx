@@ -1,8 +1,10 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import {
-    Alert,
+  Alert,
+  Image,
     ScrollView,
     StyleSheet,
     Text,
@@ -25,7 +27,7 @@ interface IncidentReportProps {
 export function IncidentReport({ onBack, onSubmit }: IncidentReportProps) {
   const [description, setDescription] = useState('');
   const [incidentType, setIncidentType] = useState('');
-  const [imageUploaded, setImageUploaded] = useState(false);
+  const [imageUri, setImageUri] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const incidentTypes = [
@@ -52,6 +54,33 @@ export function IncidentReport({ onBack, onSubmit }: IncidentReportProps) {
       });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const pickFromGallery = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      setImageUri(result.assets[0].uri);
+    }
+  };
+
+  const takePhoto = async () => {
+    const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!cameraPermission.granted) {
+      Alert.alert('Camera Permission', 'Please allow camera access to capture incident evidence.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      setImageUri(result.assets[0].uri);
     }
   };
 
@@ -125,19 +154,11 @@ export function IncidentReport({ onBack, onSubmit }: IncidentReportProps) {
             <MaterialCommunityIcons name="upload" size={20} color="#F97316" />
             <Text style={styles.cardTitle}>Upload Image (Optional)</Text>
           </View>
-          <TouchableOpacity
-            onPress={() => setImageUploaded(!imageUploaded)}
-            style={[
-              styles.uploadContainer,
-              imageUploaded && styles.uploadContainerActive,
-            ]}
-          >
-            {imageUploaded ? (
+          <TouchableOpacity onPress={() => void pickFromGallery()} style={[styles.uploadContainer, imageUri && styles.uploadContainerActive]}>
+            {imageUri ? (
               <View style={styles.uploadContent}>
-                <View style={styles.uploadIconContainer}>
-                  <MaterialCommunityIcons name="upload" size={32} color="#F97316" />
-                </View>
-                <Text style={styles.uploadedText}>Image uploaded</Text>
+                <Image source={{ uri: imageUri }} style={styles.previewImage} />
+                <Text style={styles.uploadedText}>Image attached</Text>
                 <Text style={styles.uploadSubtext}>Tap to change</Text>
               </View>
             ) : (
@@ -147,6 +168,10 @@ export function IncidentReport({ onBack, onSubmit }: IncidentReportProps) {
                 <Text style={styles.uploadSubtext}>JPG, PNG up to 10MB</Text>
               </View>
             )}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.cameraButton} onPress={() => void takePhoto()}>
+            <MaterialCommunityIcons name="camera" size={16} color="#EA580C" />
+            <Text style={styles.cameraButtonText}>Use Camera</Text>
           </TouchableOpacity>
         </View>
 
@@ -354,6 +379,29 @@ const styles = StyleSheet.create({
   uploadSubtext: {
     fontSize: 12,
     color: '#9CA3AF',
+  },
+  previewImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 10,
+    marginBottom: 8,
+  },
+  cameraButton: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#FDBA74',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    flexDirection: 'row',
+    gap: 8,
+    backgroundColor: '#FFF7ED',
+  },
+  cameraButtonText: {
+    fontSize: 13,
+    color: '#EA580C',
+    fontWeight: '600',
   },
   mapPlaceholder: {
     backgroundColor: '#F3F4F6',

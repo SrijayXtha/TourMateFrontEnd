@@ -1,5 +1,5 @@
-import React from "react";
-import { StyleSheet, View } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { Animated, StyleSheet, View } from "react-native";
 import { LatLng, Marker } from "react-native-maps";
 
 interface LiveLocationMarkerProps {
@@ -7,6 +7,28 @@ interface LiveLocationMarkerProps {
 }
 
 function LiveLocationMarker({ coordinate }: LiveLocationMarkerProps) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(scale, {
+          toValue: 1.18,
+          duration: 850,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scale, {
+          toValue: 1,
+          duration: 850,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    animation.start();
+    return () => animation.stop();
+  }, [scale]);
+
   return (
     <Marker
       coordinate={coordinate}
@@ -14,11 +36,11 @@ function LiveLocationMarker({ coordinate }: LiveLocationMarkerProps) {
       zIndex={9999}
       anchor={{ x: 0.5, y: 0.5 }}
     >
-      <View style={styles.pulse}>
+      <Animated.View style={[styles.pulse, { transform: [{ scale }] }]}>
         <View style={styles.outerRing}>
           <View style={styles.innerDot} />
         </View>
-      </View>
+      </Animated.View>
     </Marker>
   );
 }

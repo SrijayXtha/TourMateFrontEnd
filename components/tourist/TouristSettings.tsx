@@ -1,8 +1,10 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Image,
     ScrollView,
     StyleSheet,
     Switch,
@@ -16,6 +18,7 @@ import { TouristTopBar } from "../common/TouristTopBar";
 
 interface TouristSettingsProps {
   onBack: () => void;
+  initialTab?: SettingsTab;
 }
 
 type SettingsTab = "profile" | "payment" | "saved" | "privacy";
@@ -23,11 +26,6 @@ type SettingsTab = "profile" | "payment" | "saved" | "privacy";
 interface PaymentMethod {
   id: string;
   label: string;
-  brand?: string;
-  last4: string;
-  expiryMonth?: string;
-  expiryYear?: string;
-  isDefault: boolean;
 }
 
 interface SavedPlace {
@@ -37,24 +35,51 @@ interface SavedPlace {
   notes?: string;
 }
 
-export function TouristSettings({ onBack }: TouristSettingsProps) {
-  const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
+interface SavedCollection {
+  id: string;
+  title: string;
+  image: string;
+}
+
+export function TouristSettings({ onBack, initialTab = "profile" }: TouristSettingsProps) {
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
   const [loading, setLoading] = useState(true);
+  const tabTitles: Record<SettingsTab, string> = {
+    profile: "Profile Settings",
+    payment: "Payment Methods",
+    saved: "Saved Places",
+    privacy: "Privacy & Security",
+  };
 
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [emergencyContact, setEmergencyContact] = useState("");
   const [preferencesText, setPreferencesText] = useState("");
+  const [displayPhoto, setDisplayPhoto] = useState("");
 
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [paymentMethods] = useState<PaymentMethod[]>([
+    { id: "cash", label: "Cash" },
+    { id: "qr", label: "QR Scan" },
+  ]);
+
   const [savedPlaces, setSavedPlaces] = useState<SavedPlace[]>([]);
-
-  const [paymentLabel, setPaymentLabel] = useState("");
-  const [paymentLast4, setPaymentLast4] = useState("");
-  const [paymentBrand, setPaymentBrand] = useState("");
+  const [savedCollections, setSavedCollections] = useState<SavedCollection[]>([
+    {
+      id: "dogs",
+      title: "Dogs",
+      image: "https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=500&q=80",
+    },
+    {
+      id: "coffee",
+      title: "Coffee Spots",
+      image: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=500&q=80",
+    },
+  ]);
 
   const [savedPlaceName, setSavedPlaceName] = useState("");
   const [savedPlaceLocation, setSavedPlaceLocation] = useState("");
+  const [collectionTitle, setCollectionTitle] = useState("");
+  const [collectionImage, setCollectionImage] = useState("");
 
   const [profileVisibility, setProfileVisibility] = useState<"public" | "private">("public");
   const [shareLocation, setShareLocation] = useState(true);
@@ -63,9 +88,8 @@ export function TouristSettings({ onBack }: TouristSettingsProps) {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [profileRes, paymentRes, savedRes] = await Promise.all([
+      const [profileRes, savedRes] = await Promise.all([
         touristAPI.getProfile(),
-        touristAPI.getPaymentMethods(),
         touristAPI.getSavedPlaces(),
       ]);
 
@@ -74,6 +98,7 @@ export function TouristSettings({ onBack }: TouristSettingsProps) {
       setPhone(profile?.phone || "");
       setEmergencyContact(profile?.emergencyContact || "");
       setPreferencesText(Array.isArray(profile?.preferences) ? profile.preferences.join(", ") : "");
+      setDisplayPhoto(profile?.photo || "");
 
       const privacy = profile?.privacySettings;
       if (privacy) {
@@ -82,7 +107,6 @@ export function TouristSettings({ onBack }: TouristSettingsProps) {
         setTwoFactorEnabled(Boolean(privacy.twoFactorEnabled));
       }
 
-      setPaymentMethods((paymentRes?.data?.methods || []) as PaymentMethod[]);
       setSavedPlaces((savedRes?.data?.places || []) as SavedPlace[]);
     } catch (error: any) {
       Alert.alert("Error", error?.message || "Failed to load settings");
@@ -94,6 +118,10 @@ export function TouristSettings({ onBack }: TouristSettingsProps) {
   useEffect(() => {
     void loadData();
   }, []);
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   const saveProfile = async () => {
     try {
@@ -115,34 +143,15 @@ export function TouristSettings({ onBack }: TouristSettingsProps) {
     }
   };
 
-  const addPaymentMethod = async () => {
-    if (!paymentLabel || !paymentLast4) {
-      Alert.alert("Required", "Payment label and last 4 digits are required");
-      return;
-    }
+  const pickProfilePhoto = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+    });
 
-    try {
-      await touristAPI.addPaymentMethod({
-        label: paymentLabel,
-        last4: paymentLast4,
-        brand: paymentBrand || undefined,
-        isDefault: paymentMethods.length === 0,
-      });
-      setPaymentLabel("");
-      setPaymentLast4("");
-      setPaymentBrand("");
-      await loadData();
-    } catch (error: any) {
-      Alert.alert("Add Failed", error?.message || "Unable to add payment method");
-    }
-  };
-
-  const deletePaymentMethod = async (methodId: string) => {
-    try {
-      await touristAPI.removePaymentMethod(methodId);
-      await loadData();
-    } catch (error: any) {
-      Alert.alert("Delete Failed", error?.message || "Unable to delete payment method");
+    if (!result.canceled && result.assets.length > 0) {
+      setDisplayPhoto(result.assets[0].uri);
     }
   };
 
@@ -174,6 +183,24 @@ export function TouristSettings({ onBack }: TouristSettingsProps) {
     }
   };
 
+  const createCollection = () => {
+    if (!collectionTitle.trim() || !collectionImage.trim()) {
+      Alert.alert("Required", "Collection title and image URL are required.");
+      return;
+    }
+
+    setSavedCollections((current) => [
+      {
+        id: `collection-${Date.now()}`,
+        title: collectionTitle.trim(),
+        image: collectionImage.trim(),
+      },
+      ...current,
+    ]);
+    setCollectionTitle("");
+    setCollectionImage("");
+  };
+
   const savePrivacy = async () => {
     try {
       await touristAPI.updatePrivacySettings({
@@ -198,7 +225,7 @@ export function TouristSettings({ onBack }: TouristSettingsProps) {
   return (
     <View style={styles.container}>
       <TouristTopBar
-        title="Profile Settings"
+        title={tabTitles[activeTab]}
         subtitle="Manage your account preferences"
         onBack={onBack}
       />
@@ -215,9 +242,7 @@ export function TouristSettings({ onBack }: TouristSettingsProps) {
             style={[styles.tab, activeTab === tab.key && styles.activeTab]}
             onPress={() => setActiveTab(tab.key as SettingsTab)}
           >
-            <Text style={[styles.tabText, activeTab === tab.key && styles.activeTabText]}>
-              {tab.label}
-            </Text>
+            <Text style={[styles.tabText, activeTab === tab.key && styles.activeTabText]}>{tab.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -226,14 +251,27 @@ export function TouristSettings({ onBack }: TouristSettingsProps) {
         {activeTab === "profile" && (
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Edit Profile</Text>
+            <View style={styles.avatarRow}>
+              <Image
+                source={{
+                  uri:
+                    displayPhoto ||
+                    "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=300&q=80",
+                }}
+                style={styles.avatar}
+              />
+              <TouchableOpacity style={styles.secondaryButton} onPress={() => void pickProfilePhoto()}>
+                <Text style={styles.secondaryButtonText}>Change Display Picture</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.inputLabel}>Full Name</Text>
             <TextInput style={styles.input} value={fullName} onChangeText={setFullName} placeholder="Full name" />
+            <Text style={styles.inputLabel}>Phone</Text>
             <TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder="Phone" />
-            <TextInput
-              style={styles.input}
-              value={emergencyContact}
-              onChangeText={setEmergencyContact}
-              placeholder="Emergency contact"
-            />
+            <Text style={styles.inputLabel}>Emergency Contact</Text>
+            <TextInput style={styles.input} value={emergencyContact} onChangeText={setEmergencyContact} placeholder="Emergency contact" />
+            <Text style={styles.inputLabel}>Preferences</Text>
             <TextInput
               style={[styles.input, styles.multilineInput]}
               value={preferencesText}
@@ -254,30 +292,10 @@ export function TouristSettings({ onBack }: TouristSettingsProps) {
               <View key={method.id} style={styles.listItem}>
                 <View>
                   <Text style={styles.itemTitle}>{method.label}</Text>
-                  <Text style={styles.itemSubtitle}>
-                    {method.brand || "Card"} •••• {method.last4} {method.isDefault ? "(Default)" : ""}
-                  </Text>
+                  <Text style={styles.itemSubtitle}>Enabled</Text>
                 </View>
-                <TouchableOpacity onPress={() => void deletePaymentMethod(method.id)}>
-                  <MaterialCommunityIcons name="delete" size={20} color="#DC2626" />
-                </TouchableOpacity>
               </View>
             ))}
-
-            <Text style={styles.formTitle}>Add Payment Method</Text>
-            <TextInput style={styles.input} value={paymentLabel} onChangeText={setPaymentLabel} placeholder="Label (e.g. Personal Visa)" />
-            <TextInput style={styles.input} value={paymentBrand} onChangeText={setPaymentBrand} placeholder="Brand" />
-            <TextInput
-              style={styles.input}
-              value={paymentLast4}
-              onChangeText={setPaymentLast4}
-              keyboardType="number-pad"
-              maxLength={4}
-              placeholder="Last 4 digits"
-            />
-            <TouchableOpacity style={styles.primaryButton} onPress={() => void addPaymentMethod()}>
-              <Text style={styles.primaryButtonText}>Add Method</Text>
-            </TouchableOpacity>
           </View>
         )}
 
@@ -286,7 +304,11 @@ export function TouristSettings({ onBack }: TouristSettingsProps) {
             <Text style={styles.sectionTitle}>Saved Places</Text>
             {savedPlaces.map((place) => (
               <View key={place.id} style={styles.listItem}>
-                <View>
+                <Image
+                  source={{ uri: "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=300&q=80" }}
+                  style={styles.savedImage}
+                />
+                <View style={styles.savedPlaceInfo}>
                   <Text style={styles.itemTitle}>{place.name}</Text>
                   <Text style={styles.itemSubtitle}>{place.location || "No location"}</Text>
                 </View>
@@ -297,10 +319,32 @@ export function TouristSettings({ onBack }: TouristSettingsProps) {
             ))}
 
             <Text style={styles.formTitle}>Add New Place</Text>
+            <Text style={styles.inputLabel}>Place Name</Text>
             <TextInput style={styles.input} value={savedPlaceName} onChangeText={setSavedPlaceName} placeholder="Place name" />
+            <Text style={styles.inputLabel}>Location</Text>
             <TextInput style={styles.input} value={savedPlaceLocation} onChangeText={setSavedPlaceLocation} placeholder="Location" />
             <TouchableOpacity style={styles.primaryButton} onPress={() => void addSavedPlace()}>
               <Text style={styles.primaryButtonText}>Save Place</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.formTitle}>Collections</Text>
+            <View style={styles.collectionsGrid}>
+              {savedCollections.map((collection) => (
+                <View key={collection.id} style={styles.collectionTile}>
+                  <Image source={{ uri: collection.image }} style={styles.collectionImage} />
+                  <View style={styles.collectionOverlay}>
+                    <Text style={styles.collectionTitle}>{collection.title}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+
+            <Text style={styles.inputLabel}>Collection Title</Text>
+            <TextInput style={styles.input} value={collectionTitle} onChangeText={setCollectionTitle} placeholder="e.g. Day Trips" />
+            <Text style={styles.inputLabel}>Collection Cover Image URL</Text>
+            <TextInput style={styles.input} value={collectionImage} onChangeText={setCollectionImage} placeholder="https://..." />
+            <TouchableOpacity style={styles.primaryButton} onPress={createCollection}>
+              <Text style={styles.primaryButtonText}>Create Collection</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -314,10 +358,7 @@ export function TouristSettings({ onBack }: TouristSettingsProps) {
                 <Text style={styles.itemTitle}>Private Profile</Text>
                 <Text style={styles.itemSubtitle}>Hide your profile from public discovery</Text>
               </View>
-              <Switch
-                value={profileVisibility === "private"}
-                onValueChange={(value) => setProfileVisibility(value ? "private" : "public")}
-              />
+              <Switch value={profileVisibility === "private"} onValueChange={(value) => setProfileVisibility(value ? "private" : "public")} />
             </View>
 
             <View style={styles.toggleRow}>
@@ -349,16 +390,6 @@ export function TouristSettings({ onBack }: TouristSettingsProps) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F9FAFB" },
   loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center" },
-  header: {
-    backgroundColor: "#1B73E8",
-    paddingTop: 48,
-    paddingBottom: 24,
-    paddingHorizontal: 24,
-  },
-  backButton: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 },
-  backText: { color: "#fff", fontSize: 16, fontWeight: "500" },
-  headerTitle: { color: "#fff", fontSize: 28, fontWeight: "700", marginBottom: 6 },
-  headerSubtitle: { color: "rgba(255, 255, 255, 0.9)", fontSize: 14 },
   tabsRow: {
     flexDirection: "row",
     backgroundColor: "#fff",
@@ -391,6 +422,18 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: { fontSize: 18, fontWeight: "700", color: "#111827", marginBottom: 12 },
+  avatarRow: { alignItems: "center", marginBottom: 14 },
+  avatar: { width: 96, height: 96, borderRadius: 48, marginBottom: 10, backgroundColor: "#E5E7EB" },
+  secondaryButton: {
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "#EFF6FF",
+  },
+  secondaryButtonText: { color: "#1D4ED8", fontSize: 13, fontWeight: "600" },
+  inputLabel: { fontSize: 13, fontWeight: "600", color: "#374151", marginBottom: 6, marginTop: 2 },
   input: {
     borderWidth: 1,
     borderColor: "#E5E7EB",
@@ -412,7 +455,6 @@ const styles = StyleSheet.create({
   primaryButtonText: { color: "#fff", fontSize: 14, fontWeight: "700" },
   listItem: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
     borderWidth: 1,
     borderColor: "#E5E7EB",
@@ -420,9 +462,29 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 8,
   },
+  savedImage: { width: 52, height: 52, borderRadius: 10, marginRight: 10 },
+  savedPlaceInfo: { flex: 1 },
   itemTitle: { fontSize: 14, fontWeight: "600", color: "#111827" },
   itemSubtitle: { fontSize: 12, color: "#6B7280", marginTop: 2 },
   formTitle: { fontSize: 14, fontWeight: "700", color: "#111827", marginTop: 14, marginBottom: 8 },
+  collectionsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 10 },
+  collectionTile: {
+    width: "48%",
+    aspectRatio: 1,
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: "#E5E7EB",
+  },
+  collectionImage: { width: "100%", height: "100%" },
+  collectionOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: 8,
+    backgroundColor: "rgba(0,0,0,0.32)",
+  },
+  collectionTitle: { color: "#fff", fontSize: 15, fontWeight: "700" },
   toggleRow: {
     flexDirection: "row",
     justifyContent: "space-between",

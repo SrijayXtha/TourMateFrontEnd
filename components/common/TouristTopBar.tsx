@@ -1,7 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import {
-    Alert,
     StyleProp,
     StyleSheet,
     Text,
@@ -9,6 +8,7 @@ import {
     View,
     ViewStyle,
 } from "react-native";
+import { openAppMenu } from "./menu";
 
 interface TouristTopBarProps {
   title: string;
@@ -35,7 +35,7 @@ export function TouristTopBar({
       return;
     }
 
-    Alert.alert("Menu", "Menu options will be available soon.");
+    openAppMenu();
   };
 
   return (
@@ -51,7 +51,11 @@ export function TouristTopBar({
 
         {showMenu ? (
           <TouchableOpacity onPress={handleMenuPress} style={styles.iconButton} activeOpacity={0.8}>
-            <MaterialCommunityIcons name="menu" size={24} color="#FFFFFF" />
+            <View style={styles.hamburgerIcon}>
+              <View style={styles.hamburgerLine} />
+              <View style={styles.hamburgerLine} />
+              <View style={styles.hamburgerLine} />
+            </View>
           </TouchableOpacity>
         ) : (
           <View style={styles.iconButtonPlaceholder} />
@@ -82,10 +86,18 @@ const styles = StyleSheet.create({
   iconButton: {
     width: 36,
     height: 36,
-    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+  },
+  hamburgerIcon: {
+    width: 18,
+    justifyContent: "center",
+    gap: 3,
+  },
+  hamburgerLine: {
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: "#FFFFFF",
   },
   iconButtonPlaceholder: {
     width: 36,

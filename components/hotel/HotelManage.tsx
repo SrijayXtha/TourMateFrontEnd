@@ -1,8 +1,10 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Image,
     ScrollView,
     StyleSheet,
     Text,
@@ -21,6 +23,7 @@ export function HotelManage({ onBack }: HotelManageProps) {
   const [saving, setSaving] = useState(false);
 
   const [hotelName, setHotelName] = useState("");
+  const [displayPhoto, setDisplayPhoto] = useState("");
   const [location, setLocation] = useState("");
   const [description, setDescription] = useState("");
   const [basePrice, setBasePrice] = useState("");
@@ -35,6 +38,7 @@ export function HotelManage({ onBack }: HotelManageProps) {
       const response = await hotelAPI.getProfile();
       const hotel = response?.data?.hotel || {};
       setHotelName(hotel.hotelName || "");
+      setDisplayPhoto(Array.isArray(hotel.images) && hotel.images[0] ? hotel.images[0] : "");
       setLocation(hotel.location || "");
       setDescription(hotel.description || "");
       setBasePrice(hotel.basePrice !== null && hotel.basePrice !== undefined ? String(hotel.basePrice) : "");
@@ -46,6 +50,17 @@ export function HotelManage({ onBack }: HotelManageProps) {
       Alert.alert("Error", error?.message || "Failed to load hotel profile");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const pickDisplayPhoto = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      setDisplayPhoto(result.assets[0].uri);
     }
   };
 
@@ -127,8 +142,23 @@ export function HotelManage({ onBack }: HotelManageProps) {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Basic Details</Text>
+          <View style={styles.avatarRow}>
+            <Image
+              source={{
+                uri:
+                  displayPhoto || "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=300&q=80",
+              }}
+              style={styles.avatar}
+            />
+            <TouchableOpacity style={styles.photoButton} onPress={() => void pickDisplayPhoto()}>
+              <Text style={styles.photoButtonText}>Change Display Picture</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.inputLabel}>Hotel Name</Text>
           <TextInput style={styles.input} value={hotelName} onChangeText={setHotelName} placeholder="Hotel name" />
+          <Text style={styles.inputLabel}>Location</Text>
           <TextInput style={styles.input} value={location} onChangeText={setLocation} placeholder="Location" />
+          <Text style={styles.inputLabel}>Description</Text>
           <TextInput
             style={[styles.input, styles.multilineInput]}
             value={description}
@@ -136,6 +166,7 @@ export function HotelManage({ onBack }: HotelManageProps) {
             placeholder="Hotel description"
             multiline
           />
+          <Text style={styles.inputLabel}>Base Price</Text>
           <TextInput
             style={styles.input}
             value={basePrice}
@@ -147,6 +178,7 @@ export function HotelManage({ onBack }: HotelManageProps) {
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Rooms</Text>
+          <Text style={styles.inputLabel}>Total Rooms</Text>
           <TextInput
             style={styles.input}
             value={totalRooms}
@@ -154,6 +186,7 @@ export function HotelManage({ onBack }: HotelManageProps) {
             keyboardType="number-pad"
             placeholder="Total rooms"
           />
+          <Text style={styles.inputLabel}>Rooms Available</Text>
           <TextInput
             style={styles.input}
             value={roomsAvailable}
@@ -165,6 +198,7 @@ export function HotelManage({ onBack }: HotelManageProps) {
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Facilities and Media</Text>
+          <Text style={styles.inputLabel}>Facilities</Text>
           <TextInput
             style={[styles.input, styles.multilineInput]}
             value={facilitiesText}
@@ -172,6 +206,7 @@ export function HotelManage({ onBack }: HotelManageProps) {
             multiline
             placeholder="Facilities (comma separated)"
           />
+          <Text style={styles.inputLabel}>Image URLs</Text>
           <TextInput
             style={[styles.input, styles.multilineInput]}
             value={imagesText}
@@ -216,6 +251,19 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   sectionTitle: { fontSize: 16, fontWeight: "700", color: "#111827", marginBottom: 10 },
+  avatarRow: { alignItems: "center", marginBottom: 12 },
+  avatar: { width: 96, height: 96, borderRadius: 48, marginBottom: 8, backgroundColor: "#E5E7EB" },
+  photoButton: {
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "#EFF6FF",
+    marginBottom: 8,
+  },
+  photoButtonText: { color: "#1D4ED8", fontSize: 13, fontWeight: "600" },
+  inputLabel: { fontSize: 13, color: "#374151", fontWeight: "600", marginBottom: 6 },
   input: {
     borderWidth: 1,
     borderColor: "#E5E7EB",

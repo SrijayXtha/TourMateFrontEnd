@@ -1,13 +1,18 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Location from "expo-location";
+import * as Speech from "expo-speech";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    FlatList,
+    Image,
     Platform,
+    Share,
     StatusBar,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
     View
 } from "react-native";
@@ -18,6 +23,7 @@ import MapView, {
 } from "react-native-maps";
 import { api } from "../../constants/api";
 import { mockGuides, mockHotels } from "../../data/mockData";
+import { openAppMenu } from "../common/menu";
 import CustomMarker from "./CustomMarker";
 import GuideMarker from "./GuideMarker";
 import HotelMarker from "./HotelMarker";
@@ -569,6 +575,19 @@ export function TouristMap({ onBack, onNavigate }: TouristMapProps) {
   const [routeCoordinates, setRouteCoordinates] = useState<Coordinate[]>([]);
   const [routeSummary, setRouteSummary] = useState<string>("");
   const [isRouting, setIsRouting] = useState(false);
+  const [selectedMarker, setSelectedMarker] = useState<MapMarker | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [routeSteps, setRouteSteps] = useState<string[]>([]);
+  const [isVoiceMuted, setIsVoiceMuted] = useState(false);
+  const [isVoiceNavigating, setIsVoiceNavigating] = useState(false);
+  const [showRoutingControls, setShowRoutingControls] = useState(false);
+  const [isNavigationMode, setIsNavigationMode] = useState(false);
+  const [isMarkerSheetMinimized, setIsMarkerSheetMinimized] = useState(false);
+  const [routeDistanceKm, setRouteDistanceKm] = useState<number | null>(null);
+  const [routeDurationMin, setRouteDurationMin] = useState<number | null>(null);
+  const [activeDestinationName, setActiveDestinationName] = useState("");
+  const navTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const ignoreNextMapPressRef = useRef(false);
 
   const fallbackGuideMarkers = useMemo<MapMarker[]>(() => {
     return mockGuides.reduce<MapMarker[]>((markers, guide, index) => {
@@ -696,6 +715,21 @@ export function TouristMap({ onBack, onNavigate }: TouristMapProps) {
   const visiblePlaces = useMemo(() => {
     return [...visibleHotels, ...visibleInfrastructures];
   }, [visibleHotels, visibleInfrastructures]);
+
+  const searchableMarkers = useMemo(() => {
+    return [...visibleHotels, ...visibleGuides, ...visibleInfrastructures];
+  }, [visibleHotels, visibleGuides, visibleInfrastructures]);
+
+  const searchResults = useMemo(() => {
+    const query = normalize(searchQuery);
+    if (!query) {
+      return [];
+    }
+
+    return searchableMarkers
+      .filter((marker) => normalize(`${marker.name} ${marker.location}`).includes(query))
+      .slice(0, 6);
+  }, [searchQuery, searchableMarkers]);
 
   const showHotelClusters = currentRegion.latitudeDelta > 0.18;
 
@@ -937,11 +971,37 @@ export function TouristMap({ onBack, onNavigate }: TouristMapProps) {
     hasInitialZoomRef.current = true;
   }, [mapReady, userLocation]);
 
+  useEffect(() => {
+    return () => {
+      if (navTimerRef.current) {
+        clearInterval(navTimerRef.current);
+      }
+      Speech.stop();
+    };
+  }, []);
+
   const topActionOffset = Platform.OS === "android" ? (StatusBar.currentHeight ?? 0) + 18 : 52;
   const locationLabel = formatLocationLabel(userLocation);
 
   const handleMenuPress = () => {
-    Alert.alert("Menu", "Menu options will be available soon.");
+    openAppMenu();
+  };
+
+  const handleCompassPress = () => {
+    if (!mapRef.current) {
+      return;
+    }
+
+    const focus = userLocation || DEFAULT_CENTER;
+    mapRef.current.animateToRegion(
+      {
+        latitude: focus.latitude,
+        longitude: focus.longitude,
+        latitudeDelta: 0.12,
+        longitudeDelta: 0.12,
+      },
+      420
+    );
   };
 
   const handleLocatePress = () => {
@@ -961,6 +1021,144 @@ export function TouristMap({ onBack, onNavigate }: TouristMapProps) {
     );
   };
 
+  const stopVoiceNavigation = () => {
+    if (navTimerRef.current) {
+      clearInterval(navTimerRef.current);
+      navTimerRef.current = null;
+    }
+    setIsVoiceNavigating(false);
+    Speech.stop();
+  };
+
+  const resetRoutingState = () => {
+    stopVoiceNavigation();
+    setShowRoutingControls(false);
+    setIsNavigationMode(false);
+    setIsMarkerSheetMinimized(false);
+    setRouteCoordinates([]);
+    setRouteSummary("");
+    setRouteSteps([]);
+    setRouteDistanceKm(null);
+    setRouteDurationMin(null);
+    setActiveDestinationName("");
+  };
+
+  const startVoiceNavigation = () => {
+    setShowRoutingControls(true);
+    if (!routeSteps.length) {
+      Alert.alert("No route", "Select a destination first to start directions.");
+      return;
+    }
+
+    stopVoiceNavigation();
+    setIsNavigationMode(true);
+    setIsVoiceNavigating(true);
+
+    if (isVoiceMuted) {
+      return;
+    }
+
+    let stepIndex = 0;
+    Speech.speak(`Starting directions. ${routeSteps[0]}`, { rate: 0.95, pitch: 1.0 });
+    navTimerRef.current = setInterval(() => {
+      stepIndex += 1;
+      if (stepIndex >= routeSteps.length) {
+        Speech.speak("You have arrived at your destination.");
+        stopVoiceNavigation();
+        return;
+      }
+      Speech.speak(routeSteps[stepIndex], { rate: 0.95, pitch: 1.0 });
+    }, 9000);
+  };
+
+  const consumeNextMapPress = () => {
+    ignoreNextMapPressRef.current = true;
+    setTimeout(() => {
+      ignoreNextMapPressRef.current = false;
+    }, 80);
+  };
+
+  const handleMapPress = () => {
+    if (ignoreNextMapPressRef.current) {
+      return;
+    }
+    setSelectedMarker(null);
+    setIsMarkerSheetMinimized(false);
+  };
+
+  const handleSearchResultPress = (marker: MapMarker) => {
+    resetRoutingState();
+    consumeNextMapPress();
+    setSearchQuery(marker.name);
+    setSelectedMarker(marker);
+    mapRef.current?.animateToRegion(
+      {
+        latitude: marker.latitude,
+        longitude: marker.longitude,
+        latitudeDelta: 0.025,
+        longitudeDelta: 0.025,
+      },
+      450
+    );
+  };
+
+  const handleViewDetails = (marker: MapMarker) => {
+    if (marker.kind === "hotel" && marker.sourceId) {
+      const selectedHotel = mockHotels.find((item) => String(item.id) === marker.sourceId);
+      if (selectedHotel) {
+        onNavigate("hotel-details", selectedHotel);
+        return;
+      }
+    }
+
+    if (marker.kind === "guide" && marker.sourceId) {
+      const selectedGuide = mockGuides.find((item) => String(item.id) === marker.sourceId);
+      if (selectedGuide) {
+        onNavigate("guide-profile", selectedGuide);
+        return;
+      }
+    }
+
+    Alert.alert(marker.name, markerDescription(marker));
+  };
+
+  const handleDirectionsPress = async (marker: MapMarker) => {
+    setShowRoutingControls(true);
+    setIsMarkerSheetMinimized(true);
+    await buildRouteWithOSRM(marker, marker.name);
+  };
+
+  const handleShareMarker = async (marker: MapMarker) => {
+    const shareLink = `https://tourmate.app/map/${encodeURIComponent(marker.kind)}/${encodeURIComponent(marker.sourceId || marker.id)}`;
+    await Share.share({
+      title: `${marker.name} - TourMate`,
+      message: `Check this place on TourMate: ${marker.name} (${marker.location}) ${shareLink}`,
+      url: shareLink,
+    });
+  };
+
+  const handleSaveMarker = (marker: MapMarker) => {
+    Alert.alert("Saved", `${marker.name} has been saved to your places.`);
+  };
+
+  const getMarkerImage = (marker: MapMarker): string => {
+    if (marker.kind === "hotel" && marker.sourceId) {
+      const selectedHotel = mockHotels.find((item) => String(item.id) === marker.sourceId);
+      if (selectedHotel?.image) {
+        return selectedHotel.image;
+      }
+    }
+
+    if (marker.kind === "guide" && marker.sourceId) {
+      const selectedGuide = mockGuides.find((item) => String(item.id) === marker.sourceId);
+      if (typeof selectedGuide?.photo === "string") {
+        return selectedGuide.photo;
+      }
+    }
+
+    return "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=500&q=80";
+  };
+
   const buildRouteWithOSRM = async (destination: Coordinate, destinationName: string) => {
     const originPoint = userLocation || DEFAULT_CENTER;
 
@@ -970,7 +1168,7 @@ export function TouristMap({ onBack, onNavigate }: TouristMapProps) {
       const url =
         `https://router.project-osrm.org/route/v1/driving/` +
         `${originPoint.longitude},${originPoint.latitude};${destination.longitude},${destination.latitude}` +
-        `?overview=full&geometries=geojson`;
+        `?overview=full&geometries=geojson&steps=true`;
 
       const response = await fetch(url);
       if (!response.ok) {
@@ -999,9 +1197,23 @@ export function TouristMap({ onBack, onNavigate }: TouristMapProps) {
 
       const distanceKm = Number((Number(firstRoute.distance || 0) / 1000).toFixed(1));
       const durationMin = Math.max(1, Math.round(Number(firstRoute.duration || 0) / 60));
+      const legs = Array.isArray(firstRoute?.legs) ? firstRoute.legs : [];
+      const steps = legs.flatMap((leg: any) => (Array.isArray(leg?.steps) ? leg.steps : []));
+      const spokenSteps = steps
+        .map((step: any) => {
+          const road = String(step?.name || "the road").trim();
+          const instruction = String(step?.maneuver?.modifier || step?.maneuver?.type || "continue");
+          return `Next, ${instruction} on ${road}`;
+        })
+        .filter(Boolean)
+        .slice(0, 12);
 
       setRouteCoordinates(route);
       setRouteSummary(`${destinationName} • ${distanceKm} km • ${durationMin} min`);
+      setRouteSteps(spokenSteps.length ? spokenSteps : [`Continue towards ${destinationName}`]);
+      setRouteDistanceKm(distanceKm);
+      setRouteDurationMin(durationMin);
+      setActiveDestinationName(destinationName);
 
       if (mapRef.current) {
         mapRef.current.fitToCoordinates(route, {
@@ -1022,31 +1234,24 @@ export function TouristMap({ onBack, onNavigate }: TouristMapProps) {
   };
 
   const handleHotelPress = (hotel: MapMarker) => {
-    if (hotel.sourceId) {
-      const selectedHotel = mockHotels.find((item) => String(item.id) === hotel.sourceId);
-      if (selectedHotel) {
-        onNavigate("hotel-details", selectedHotel);
-        return;
-      }
-    }
-
-    void buildRouteWithOSRM(hotel, hotel.name);
+    resetRoutingState();
+    consumeNextMapPress();
+    setSelectedMarker(hotel);
+    setIsMarkerSheetMinimized(false);
   };
 
   const handleGuidePress = (guide: MapMarker) => {
-    if (guide.sourceId) {
-      const selectedGuide = mockGuides.find((item) => String(item.id) === guide.sourceId);
-      if (selectedGuide) {
-        onNavigate("guide-profile", selectedGuide);
-        return;
-      }
-    }
-
-    Alert.alert(guide.name, markerDescription(guide));
+    resetRoutingState();
+    consumeNextMapPress();
+    setSelectedMarker(guide);
+    setIsMarkerSheetMinimized(false);
   };
 
   const handleGenericMarkerPress = (marker: MapMarker) => {
-    Alert.alert(marker.name, markerDescription(marker));
+    resetRoutingState();
+    consumeNextMapPress();
+    setSelectedMarker(marker);
+    setIsMarkerSheetMinimized(false);
   };
 
   return (
@@ -1061,6 +1266,7 @@ export function TouristMap({ onBack, onNavigate }: TouristMapProps) {
         showsUserLocation={false}
         onMapReady={() => setMapReady(true)}
         onRegionChangeComplete={(region) => setCurrentRegion(region)}
+        onPress={handleMapPress}
       >
         <UrlTile urlTemplate={CARTO_LIGHT_TILE_TEMPLATE} maximumZ={20} flipY={false} zIndex={0} />
 
@@ -1122,66 +1328,266 @@ export function TouristMap({ onBack, onNavigate }: TouristMapProps) {
         </View>
       ) : null}
 
-      <View pointerEvents="box-none" style={[styles.topActionOverlay, { top: topActionOffset }]}> 
+      {!isNavigationMode ? (
+      <View pointerEvents="box-none" style={[styles.topActionOverlay, { top: topActionOffset }]}>
         <TouchableOpacity onPress={onBack} style={styles.topIconButton} activeOpacity={0.85}>
           <MaterialCommunityIcons name="arrow-left" size={21} color="#1F2937" />
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={handleMenuPress} style={styles.topIconButton} activeOpacity={0.85}>
-          <MaterialCommunityIcons name="menu" size={22} color="#1F2937" />
-        </TouchableOpacity>
-      </View>
+        <View style={styles.topRightActions}>
+          <TouchableOpacity onPress={handleMenuPress} style={styles.menuIconButton} activeOpacity={0.85}>
+            <View style={styles.hamburgerIcon}>
+              <View style={styles.hamburgerLine} />
+              <View style={styles.hamburgerLine} />
+              <View style={styles.hamburgerLine} />
+            </View>
+          </TouchableOpacity>
 
+          <TouchableOpacity onPress={handleCompassPress} style={styles.topIconButton} activeOpacity={0.85}>
+            <MaterialCommunityIcons name="compass-outline" size={22} color="#1F2937" />
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={handleLocatePress} style={styles.topIconButton} activeOpacity={0.85}>
+            <MaterialCommunityIcons name="crosshairs-gps" size={21} color="#1F2937" />
+          </TouchableOpacity>
+        </View>
+      </View>
+      ) : null}
+
+      {!isNavigationMode ? (
+      <View style={styles.searchShell}>
+        <MaterialCommunityIcons name="magnify" size={18} color="#6B7280" />
+        <TextInput
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Search hotels, guides, places"
+          placeholderTextColor="#9CA3AF"
+          style={styles.searchInput}
+        />
+      </View>
+      ) : null}
+      {searchResults.length > 0 ? (
+        <View style={styles.searchResultsCard}>
+          <FlatList
+            data={searchResults}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <TouchableOpacity style={styles.searchResultItem} onPress={() => handleSearchResultPress(item)}>
+                <Text style={styles.searchResultTitle}>{item.name}</Text>
+                <Text style={styles.searchResultMeta}>{item.location}</Text>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      ) : null}
+
+      {!isNavigationMode ? (
       <View style={styles.locationChip}>
         <MaterialCommunityIcons name="crosshairs-gps" size={14} color="#2f3d4f" />
         <Text style={styles.locationChipLabel}>{locationLabel}</Text>
       </View>
+      ) : null}
 
-      <TouchableOpacity onPress={handleLocatePress} style={styles.locateButton} activeOpacity={0.9}>
-        <Text style={styles.locateButtonText}>Loc</Text>
-      </TouchableOpacity>
+      {showRoutingControls && !isNavigationMode ? (
+        <View style={styles.directionsControls}>
+          <TouchableOpacity style={styles.directionButton} onPress={startVoiceNavigation} activeOpacity={0.9}>
+            <MaterialCommunityIcons name="play-circle-outline" size={18} color="#1B73E8" />
+            <Text style={styles.directionButtonText}>Start</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.directionButton}
+            onPress={() => {
+              stopVoiceNavigation();
+              setShowRoutingControls(false);
+              setIsNavigationMode(false);
+              setIsMarkerSheetMinimized(false);
+              setRouteCoordinates([]);
+              setRouteSummary("");
+              setRouteSteps([]);
+              setRouteDistanceKm(null);
+              setRouteDurationMin(null);
+              setActiveDestinationName("");
+            }}
+            activeOpacity={0.9}
+          >
+            <MaterialCommunityIcons name="stop-circle-outline" size={18} color="#DC2626" />
+            <Text style={styles.directionButtonText}>End</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.voiceButton}
+            onPress={() => {
+              const next = !isVoiceMuted;
+              setIsVoiceMuted(next);
+              if (next) {
+                Speech.stop();
+              } else if (isVoiceNavigating && routeSteps[0]) {
+                Speech.speak(routeSteps[0], { rate: 0.95 });
+              }
+            }}
+            activeOpacity={0.9}
+          >
+            <MaterialCommunityIcons name={isVoiceMuted ? "volume-off" : "volume-high"} size={20} color="#1F2937" />
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
-      {/* Bottom-left map legend */}
-      <View style={styles.leftLegendCard}>
-        <View style={styles.legendRow}>
-          <View style={styles.legendBlueDot} />
-          <Text style={styles.legendText}>Current/POI</Text>
-        </View>
-        <View style={styles.legendRow}>
-          <View style={styles.legendOrangePin} />
-          <Text style={styles.legendText}>Hotel</Text>
-        </View>
-        <View style={styles.legendRow}>
-          <View style={styles.legendGreenPin} />
-          <Text style={styles.legendText}>Tourist Guide</Text>
-        </View>
-      </View>
-
-      {/* Infrastructure summary */}
-      <View style={styles.infrastructureCard}>
-        <Text style={styles.infrastructureTitle}>Infrastructure</Text>
-        <Text style={styles.infrastructureText}>
-          Hospitals • Schools • Colleges • Govt Offices • Temples • Parks • Water
-        </Text>
-      </View>
-
-      {/* Bottom-right legend requested: only guides and hotels */}
-      <View style={styles.rightLegendCard}>
-        <View style={styles.legendRow}>
-          <View style={styles.legendOrangePin} />
-          <Text style={styles.legendText}>Hotels</Text>
-        </View>
-        <View style={styles.legendRow}>
-          <View style={styles.legendGreenPin} />
-          <Text style={styles.legendText}>Guides</Text>
-        </View>
-      </View>
-
-      {(isRouting || routeSummary) && (
+      {(isRouting || routeSummary) && !isNavigationMode ? (
         <View style={styles.routeChip}>
           <Text style={styles.routeChipText}>{isRouting ? "Routing..." : routeSummary}</Text>
         </View>
-      )}
+      ) : null}
+
+      {selectedMarker ? (
+        <View style={[styles.bottomSheetCard, isMarkerSheetMinimized && styles.bottomSheetCardMinimized]}>
+          <TouchableOpacity
+            style={styles.bottomSheetClose}
+            onPress={() => {
+              setSelectedMarker(null);
+              setIsMarkerSheetMinimized(false);
+            }}
+            activeOpacity={0.8}
+          >
+            <MaterialCommunityIcons name="close" size={20} color="#374151" />
+          </TouchableOpacity>
+
+          {!isMarkerSheetMinimized ? (
+            <>
+          <Image source={{ uri: getMarkerImage(selectedMarker) }} style={styles.bottomSheetImage} />
+
+          <View style={styles.bottomSheetImageActionsRow}>
+            <View style={styles.bottomSheetInfo}>
+              <Text style={styles.bottomSheetTitle}>{selectedMarker.name}</Text>
+              <Text style={styles.bottomSheetMeta}>{selectedMarker.location}</Text>
+              {selectedMarker.rating ? (
+                <View style={styles.ratingRow}>
+                  <MaterialCommunityIcons name="star" size={14} color="#F59E0B" />
+                  <Text style={styles.ratingText}>{selectedMarker.rating.toFixed(1)}</Text>
+                  {selectedMarker.stars ? (
+                    <Text style={styles.ratingSubtext}>{` • ${selectedMarker.stars}-star`}</Text>
+                  ) : null}
+                </View>
+              ) : null}
+            </View>
+
+            <View style={styles.bottomSheetIconActions}>
+              <TouchableOpacity
+                style={styles.iconActionButton}
+                onPress={() => void handleShareMarker(selectedMarker)}
+                activeOpacity={0.8}
+              >
+                <MaterialCommunityIcons name="share-variant" size={20} color="#1F2937" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.iconActionButton}
+                onPress={() => handleSaveMarker(selectedMarker)}
+                activeOpacity={0.8}
+              >
+                <MaterialCommunityIcons name="bookmark-outline" size={20} color="#1F2937" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <Text style={styles.bottomSheetMeta}>{markerDescription(selectedMarker)}</Text>
+
+          {selectedMarker.kind === "hotel" ? (
+            <View style={styles.bottomSheetActionsRow}>
+              <TouchableOpacity style={styles.actionChip} onPress={() => handleViewDetails(selectedMarker)}>
+                <Text style={styles.actionChipText}>View details</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.actionChip} onPress={() => void handleDirectionsPress(selectedMarker)}>
+                <Text style={styles.actionChipText}>Directions</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.actionChip}
+                onPress={async () => {
+                  await handleDirectionsPress(selectedMarker);
+                  startVoiceNavigation();
+                }}
+              >
+                <Text style={styles.actionChipText}>Start</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+          {selectedMarker.kind === "guide" ? (
+            <View style={styles.bottomSheetActionsRow}>
+              <TouchableOpacity style={styles.actionChip} onPress={() => handleViewDetails(selectedMarker)}>
+                <Text style={styles.actionChipText}>View details</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.actionChip} onPress={() => void handleDirectionsPress(selectedMarker)}>
+                <Text style={styles.actionChipText}>Directions</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+          {selectedMarker.kind !== "hotel" && selectedMarker.kind !== "guide" ? (
+            <TouchableOpacity
+              style={styles.bottomSheetButton}
+              onPress={() => void handleDirectionsPress(selectedMarker)}
+              activeOpacity={0.9}
+            >
+              <Text style={styles.bottomSheetButtonText}>Directions</Text>
+            </TouchableOpacity>
+          ) : null}
+            </>
+          ) : (
+            <View style={styles.minimizedMarkerRow}>
+              <Text style={styles.minimizedMarkerTitle} numberOfLines={1}>
+                {selectedMarker.name}
+              </Text>
+              <TouchableOpacity
+                style={styles.minimizedExpandButton}
+                onPress={() => setIsMarkerSheetMinimized(false)}
+                activeOpacity={0.85}
+              >
+                <MaterialCommunityIcons name="chevron-up" size={18} color="#1F2937" />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      ) : null}
+
+      {isNavigationMode ? (
+        <>
+          <View style={styles.navTopBanner}>
+            <View style={styles.navTopMain}>
+              <MaterialCommunityIcons name="arrow-up" size={22} color="#FFFFFF" />
+              <Text style={styles.navTopText} numberOfLines={1}>
+                toward {activeDestinationName || "Destination"}
+              </Text>
+            </View>
+            <View style={styles.navThenCard}>
+              <Text style={styles.navThenText}>Then</Text>
+              <MaterialCommunityIcons name="arrow-top-right" size={16} color="#FFFFFF" />
+            </View>
+          </View>
+
+          <View style={styles.navBottomPanel}>
+            <View>
+              <Text style={styles.navEtaText}>{routeDurationMin ?? 0} min</Text>
+              <Text style={styles.navMetaText}>{routeDistanceKm ?? 0} km • live guidance</Text>
+            </View>
+            <View style={styles.navBottomActions}>
+              <TouchableOpacity
+                style={styles.navCircleButton}
+                onPress={() => setIsVoiceMuted((prev) => !prev)}
+                activeOpacity={0.85}
+              >
+                <MaterialCommunityIcons
+                  name={isVoiceMuted ? "volume-off" : "volume-high"}
+                  size={18}
+                  color="#1F2937"
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.navExitButton}
+                onPress={resetRoutingState}
+                activeOpacity={0.9}
+              >
+                <Text style={styles.navExitText}>Exit</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </>
+      ) : null}
     </View>
   );
 }
@@ -1224,9 +1630,80 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 3,
   },
+  menuIconButton: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
+  },
+  topRightActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  hamburgerIcon: {
+    width: 18,
+    justifyContent: "center",
+    gap: 3,
+  },
+  hamburgerLine: {
+    height: 2,
+    backgroundColor: "#1F2937",
+    borderRadius: 1,
+  },
+  searchShell: {
+    position: "absolute",
+    top: 102,
+    left: 16,
+    right: 16,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.98)",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    gap: 8,
+    zIndex: 46,
+  },
+  searchInput: {
+    flex: 1,
+    color: "#111827",
+    fontSize: 14,
+  },
+  searchResultsCard: {
+    position: "absolute",
+    top: 148,
+    left: 16,
+    right: 16,
+    maxHeight: 220,
+    borderRadius: 12,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    zIndex: 47,
+  },
+  searchResultItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  searchResultTitle: {
+    color: "#111827",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  searchResultMeta: {
+    color: "#6B7280",
+    fontSize: 12,
+    marginTop: 2,
+  },
   locationChip: {
     position: "absolute",
-    top: 96,
+    top: 156,
     left: 16,
     height: 34,
     paddingHorizontal: 12,
@@ -1273,29 +1750,6 @@ const styles = StyleSheet.create({
   controlButtonTextActive: {
     color: "#1f3046",
   },
-  locateButton: {
-    position: "absolute",
-    top: 146,
-    right: 16,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.96)",
-    shadowColor: "#3A526B",
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 3,
-    zIndex: 45,
-  },
-  locateButtonText: {
-    color: "#3478f6",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-
   // Marker styles
   landmarkMarkerShell: {
     width: 122,
@@ -1498,20 +1952,306 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "#FFFFFF",
   },
+  directionsControls: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    bottom: 108,
+    flexDirection: "row",
+    gap: 8,
+    zIndex: 41,
+  },
+  directionButton: {
+    flex: 1,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.98)",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 8,
+  },
+  voiceButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.98)",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  directionButtonText: {
+    color: "#1F2937",
+    fontSize: 13,
+    fontWeight: "700",
+  },
   routeChip: {
     position: "absolute",
     left: 14,
     right: 14,
-    bottom: 160,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: "rgba(17, 24, 39, 0.82)",
+    bottom: 178,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: "rgba(17, 24, 39, 0.92)",
     zIndex: 40,
   },
   routeChipText: {
     color: "#FFFFFF",
     fontSize: 12,
     fontWeight: "600",
+  },
+  bottomSheetCard: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    bottom: 74,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 14,
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 6,
+    zIndex: 42,
+  },
+  bottomSheetCardMinimized: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  bottomSheetTitle: {
+    fontSize: 16,
+    color: "#111827",
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  bottomSheetImage: {
+    width: "100%",
+    height: 120,
+    borderRadius: 10,
+    marginBottom: 10,
+    backgroundColor: "#E5E7EB",
+  },
+  bottomSheetMeta: {
+    fontSize: 12,
+    color: "#6B7280",
+    marginBottom: 2,
+  },
+  bottomSheetActionsRow: {
+    marginTop: 10,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  actionChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    backgroundColor: "#EFF6FF",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  actionChipText: {
+    color: "#1D4ED8",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  bottomSheetButton: {
+    marginTop: 10,
+    alignSelf: "flex-start",
+    backgroundColor: "#1B73E8",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  bottomSheetButtonText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  bottomSheetClose: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.92)",
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+    zIndex: 5,
+  },
+  bottomSheetImageActionsRow: {
+    marginTop: 8,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  bottomSheetInfo: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  bottomSheetIconActions: {
+    alignItems: "flex-end",
+    justifyContent: "flex-start",
+    gap: 8,
+  },
+  iconActionButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: "#F3F4F6",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  ratingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+    gap: 4,
+  },
+  ratingText: {
+    color: "#111827",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  ratingSubtext: {
+    color: "#6B7280",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  minimizedMarkerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 2,
+    paddingRight: 42,
+  },
+  minimizedMarkerTitle: {
+    flex: 1,
+    color: "#111827",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  minimizedExpandButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: "#F3F4F6",
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 8,
+  },
+  navTopBanner: {
+    position: "absolute",
+    top: 58,
+    left: 12,
+    right: 12,
+    zIndex: 60,
+  },
+  navTopMain: {
+    backgroundColor: "#036666",
+    borderRadius: 18,
+    minHeight: 82,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  navTopText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+    flex: 1,
+  },
+  navThenCard: {
+    marginTop: 8,
+    alignSelf: "flex-start",
+    backgroundColor: "#045d5d",
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
+    borderTopRightRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  navThenText: {
+    color: "#FFFFFF",
+    fontSize: 24,
+    fontWeight: "700",
+  },
+  navBottomPanel: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    bottom: 20,
+    minHeight: 84,
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    zIndex: 60,
+    shadowColor: "#000",
+    shadowOpacity: 0.14,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 7,
+  },
+  navEtaText: {
+    color: "#2A7E3B",
+    fontSize: 34,
+    fontWeight: "700",
+    lineHeight: 38,
+  },
+  navMetaText: {
+    color: "#4B5563",
+    fontSize: 16,
+    fontWeight: "500",
+    marginTop: 2,
+  },
+  navBottomActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  navCircleButton: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: "#F3F4F6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  navExitButton: {
+    minWidth: 90,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: "#EF4444",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 18,
+  },
+  navExitText: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "700",
   },
 });

@@ -1,6 +1,9 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useState } from "react";
 import {
+    Alert,
+    Image,
     ScrollView,
     StyleSheet,
     Text,
@@ -28,6 +31,7 @@ interface AdminPanelProps {
 }
 
 export function AdminPanel({ onNavigate, onLogout }: AdminPanelProps) {
+  const [displayPhoto, setDisplayPhoto] = useState("");
   const [analytics, setAnalytics] = useState({
     totalUsers: 1247,
     userGrowth: 12.5,
@@ -73,6 +77,18 @@ export function AdminPanel({ onNavigate, onLogout }: AdminPanelProps) {
     void loadDashboard();
   }, []);
 
+  const pickDisplayPhoto = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      setDisplayPhoto(result.assets[0].uri);
+      Alert.alert("Updated", "Display picture updated for admin profile.");
+    }
+  };
+
   const pendingVerifications =
     analytics.pendingGuideVerifications + analytics.pendingHotelVerifications;
 
@@ -81,7 +97,19 @@ export function AdminPanel({ onNavigate, onLogout }: AdminPanelProps) {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <Text style={styles.headerTitle}>Admin Dashboard</Text>
+          <View style={styles.profileHeaderBlock}>
+            <Image
+              source={{
+                uri:
+                  displayPhoto || "https://images.unsplash.com/photo-1556157382-97eda2d62296?w=300&q=80",
+              }}
+              style={styles.profileAvatar}
+            />
+            <TouchableOpacity style={styles.photoAction} onPress={() => void pickDisplayPhoto()}>
+              <Text style={styles.photoActionText}>Change Display Picture</Text>
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Admin Dashboard</Text>
+          </View>
           <TouchableOpacity style={styles.logoutButton} onPress={onLogout}>
             <MaterialCommunityIcons name="logout" size={16} color="#FFFFFF" />
             <Text style={styles.logoutButtonText}>Logout</Text>
@@ -414,8 +442,32 @@ const styles = StyleSheet.create({
   headerTop: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 12,
+  },
+  profileHeaderBlock: {
+    alignItems: "flex-start",
+  },
+  profileAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginBottom: 8,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.7)",
+  },
+  photoAction: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.45)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginBottom: 10,
+  },
+  photoActionText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "700",
   },
   headerTitle: {
     color: "#FFFFFF",

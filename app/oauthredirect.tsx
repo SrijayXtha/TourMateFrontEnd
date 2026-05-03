@@ -1,42 +1,88 @@
-import * as WebBrowser from "expo-web-browser";
-import { useEffect } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 
-// Complete the auth session when this redirect page loads in the popup.
-WebBrowser.maybeCompleteAuthSession({ skipRedirectCheck: true });
+export default function OAuthRedirectScreen() {
+  const [statusText, setStatusText] = useState("Completing Google sign-in...");
+  const router = useRouter();
+  const params = useLocalSearchParams();
 
-export default function OAuthRedirect() {
-	useEffect(() => {
-		WebBrowser.maybeCompleteAuthSession({ skipRedirectCheck: true });
-	}, []);
+  useEffect(() => {
+    const completeAuth = async () => {
+      try {
+        // Extract the ID token from URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const idToken = urlParams.get('id_token') || params.id_token as string;
+        const error = urlParams.get('error') || params.error as string;
 
-	return (
-		<View style={styles.container}>
-			<ActivityIndicator size="large" color="#1a73e8" />
-			<Text style={styles.title}>Completing sign-in...</Text>
-			<Text style={styles.subtitle}>You can close this window if it does not close automatically.</Text>
-		</View>
-	);
+        if (error) {
+          console.error("OAuth error:", error);
+          setStatusText("Authentication failed. Please try again.");
+          setTimeout(() => {
+            router.replace('/login');
+          }, 2000);
+          return;
+        }
+
+        if (idToken) {
+          // Store the token temporarily for the login screen to process
+          sessionStorage.setItem('google_id_token', idToken);
+          setStatusText("Authentication successful! Redirecting...");
+          
+          // Redirect back to login screen
+          setTimeout(() => {
+            router.replace('/login');
+          }, 1000);
+        } else {
+          console.error("No ID token found in redirect");
+          setStatusText("Authentication failed. No token received.");
+          setTimeout(() => {
+            router.replace('/login');
+          }, 2000);
+        }
+      } catch (error) {
+        console.error("OAuth redirect error:", error);
+        setStatusText("An error occurred. Please try again.");
+        setTimeout(() => {
+          router.replace('/login');
+        }, 2000);
+      }
+    };
+
+    completeAuth();
+  }, [router, params]);
+
+  return (
+    <View style={styles.container}>
+      <ActivityIndicator size="large" color="#2563EB" />
+      <Text style={styles.text}>{statusText}</Text>
+    </View>
+  );
 }
 
+
 const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		alignItems: "center",
-		justifyContent: "center",
-		backgroundColor: "#ffffff",
-		paddingHorizontal: 24,
-	},
-	title: {
-		marginTop: 16,
-		fontSize: 18,
-		fontWeight: "600",
-		color: "#1f2937",
-	},
-	subtitle: {
-		marginTop: 8,
-		fontSize: 14,
-		textAlign: "center",
-		color: "#4b5563",
-	},
+  container: {
+
+    flex: 1,
+
+    alignItems: "center",
+
+    justifyContent: "center",
+
+    backgroundColor: "#F8FAFC",
+
+    gap: 12,
+
+  },
+
+  text: {
+
+    fontSize: 16,
+
+    color: "#111827",
+
+  },
+
 });
+

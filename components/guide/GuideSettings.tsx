@@ -1,8 +1,10 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Image,
     ScrollView,
     StyleSheet,
     Switch,
@@ -33,6 +35,7 @@ export function GuideSettings({ onBack, onLogout }: GuideSettingsProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [bio, setBio] = useState("");
+  const [displayPhoto, setDisplayPhoto] = useState("");
   const [experienceYears, setExperienceYears] = useState("0");
   const [specialityLocation, setSpecialityLocation] = useState("");
   const [isAvailable, setIsAvailable] = useState(true);
@@ -44,6 +47,7 @@ export function GuideSettings({ onBack, onLogout }: GuideSettingsProps) {
       const response = await guideAPI.getProfile();
       const profile = response?.data?.guide || {};
       setBio(profile.bio || "");
+      setDisplayPhoto(profile.photo || "");
       setExperienceYears(String(profile.experienceYears || 0));
       setSpecialityLocation(profile.specialityLocation || "");
       setIsAvailable(Boolean(profile.isAvailable ?? true));
@@ -52,6 +56,17 @@ export function GuideSettings({ onBack, onLogout }: GuideSettingsProps) {
       Alert.alert("Error", error?.message || "Failed to load guide profile");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const pickDisplayPhoto = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      setDisplayPhoto(result.assets[0].uri);
     }
   };
 
@@ -125,6 +140,19 @@ export function GuideSettings({ onBack, onLogout }: GuideSettingsProps) {
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Profile</Text>
+          <View style={styles.avatarRow}>
+            <Image
+              source={{
+                uri:
+                  displayPhoto || "https://images.unsplash.com/photo-1544723795-3fb6469f5b39?w=300&q=80",
+              }}
+              style={styles.avatar}
+            />
+            <TouchableOpacity style={styles.photoButton} onPress={() => void pickDisplayPhoto()}>
+              <Text style={styles.photoButtonText}>Change Display Picture</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.inputLabel}>Professional Bio</Text>
           <TextInput
             style={[styles.input, styles.multilineInput]}
             value={bio}
@@ -132,6 +160,7 @@ export function GuideSettings({ onBack, onLogout }: GuideSettingsProps) {
             multiline
             placeholder="Professional bio"
           />
+          <Text style={styles.inputLabel}>Experience Years</Text>
           <TextInput
             style={styles.input}
             value={experienceYears}
@@ -240,6 +269,17 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginTop: 4,
   },
+  avatarRow: { alignItems: "center", marginBottom: 12 },
+  avatar: { width: 92, height: 92, borderRadius: 46, marginBottom: 8, backgroundColor: "#E5E7EB" },
+  photoButton: {
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: "#EFF6FF",
+  },
+  photoButtonText: { color: "#1D4ED8", fontSize: 13, fontWeight: "600" },
   multilineInput: { minHeight: 90, textAlignVertical: "top" },
   locationChipsContainer: {
     flexDirection: "row",

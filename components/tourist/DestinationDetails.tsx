@@ -4,6 +4,7 @@ import {
     Alert,
     Image,
     ScrollView,
+    Share,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -114,6 +115,14 @@ export function DestinationDetails({ destination, onBack, onNavigate }: Destinat
   };
 
   const difficultyColors = getDifficultyColor(destination.difficulty);
+  const handleShareLocation = async () => {
+    const shareLink = `https://tourmate.app/place/${encodeURIComponent(destination.id)}`;
+    await Share.share({
+      message: `Explore ${destination.name} (${destination.location}) on TourMate: ${shareLink}`,
+      url: shareLink,
+      title: `${destination.name} - TourMate`,
+    });
+  };
 
   return (
     <View style={styles.container}>
@@ -123,30 +132,29 @@ export function DestinationDetails({ destination, onBack, onNavigate }: Destinat
         onBack={onBack}
       />
 
-      {/* Header Image */}
-      <View style={styles.imageContainer}>
-        <Image
-          source={{ uri: destination.image }}
-          style={styles.headerImage}
-          resizeMode="cover"
-        />
-        <View
-          style={[
-            styles.difficultyBadge,
-            { backgroundColor: difficultyColors.bg },
-          ]}
-        >
-          <Text style={[styles.difficultyText, { color: difficultyColors.text }]}>
-            {destination.difficulty}
-          </Text>
-        </View>
-      </View>
-
       {/* Content */}
       <ScrollView
-        style={styles.content}
+        contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
+        {/* Header Image */}
+        <View style={styles.imageContainer}>
+          <Image
+            source={{ uri: destination.image }}
+            style={styles.headerImage}
+            resizeMode="cover"
+          />
+          <View
+            style={[
+              styles.difficultyBadge,
+              { backgroundColor: difficultyColors.bg },
+            ]}
+          >
+            <Text style={[styles.difficultyText, { color: difficultyColors.text }]}>
+              {destination.difficulty}
+            </Text>
+          </View>
+        </View>
         <View style={styles.contentPadding}>
           {/* Title & Rating */}
           <View style={styles.section}>
@@ -164,6 +172,10 @@ export function DestinationDetails({ destination, onBack, onNavigate }: Destinat
             <View style={styles.categoryBadge}>
               <Text style={styles.categoryText}>{destination.category}</Text>
             </View>
+            <TouchableOpacity style={styles.shareLocationButton} onPress={() => void handleShareLocation()}>
+              <MaterialCommunityIcons name="share-variant-outline" size={16} color="#1B73E8" />
+              <Text style={styles.shareLocationText}>Share Profile</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Quick Info */}
@@ -416,7 +428,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   content: {
-    flex: 1,
+    paddingBottom: 20,
   },
   contentPadding: {
     paddingHorizontal: 16,
@@ -471,6 +483,24 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  shareLocationButton: {
+    marginTop: 10,
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#93C5FD',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: '#EFF6FF',
+  },
+  shareLocationText: {
+    color: '#1B73E8',
     fontSize: 13,
     fontWeight: '600',
   },

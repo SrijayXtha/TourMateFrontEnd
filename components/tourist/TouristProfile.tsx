@@ -13,16 +13,16 @@ import { TouristTopBar } from "../common/TouristTopBar";
 interface TouristProfileProps {
   onLogout: () => void;
   onBack: () => void;
-  onNavigate?: (screen: string) => void;
+  onNavigate?: (screen: string, data?: any) => void;
 }
 
 export function TouristProfile({ onLogout, onBack, onNavigate }: TouristProfileProps) {
   const menuItems = [
-    { icon: "cog", label: "Account Settings", color: "#6B7280", screen: "settings" },
+    { icon: "cog", label: "Account Settings", color: "#6B7280", screen: "settings-profile" },
     { icon: "bell", label: "Notifications", color: "#6B7280", screen: "notifications" },
-    { icon: "credit-card", label: "Payment Methods", color: "#6B7280", screen: "settings" },
-    { icon: "heart", label: "Saved Places", color: "#6B7280", screen: "settings" },
-    { icon: "shield-check", label: "Privacy & Security", color: "#6B7280", screen: "settings" },
+    { icon: "credit-card", label: "Payment Methods", color: "#6B7280", screen: "settings-payment" },
+    { icon: "heart", label: "Saved Places", color: "#6B7280", screen: "settings-saved" },
+    { icon: "shield-check", label: "Privacy & Security", color: "#6B7280", screen: "settings-privacy" },
   ];
 
   const handleMenuClick = (label: string, screen: string) => {

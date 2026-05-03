@@ -6,6 +6,7 @@ import {
     Image,
     Platform,
     ScrollView,
+    Share,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -134,6 +135,15 @@ export function GuideProfile({ guide, onBack, onBook, onMessage }: GuideProfileP
     onBook(startDate, endDate);
   };
 
+  const handleShareProfile = async () => {
+    const shareLink = `https://tourmate.app/guide/${encodeURIComponent(String(guide.id))}`;
+    await Share.share({
+      message: `Check out guide ${guide.name} on TourMate: ${shareLink}`,
+      url: shareLink,
+      title: `${guide.name} - TourMate`,
+    });
+  };
+
   const formatInputDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString('en-US');
@@ -195,6 +205,25 @@ export function GuideProfile({ guide, onBack, onBook, onMessage }: GuideProfileP
 
       {/* Content */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.compactProfileCard}>
+          <Image
+            source={typeof guide.photo === 'string' ? { uri: guide.photo } : guide.photo}
+            style={styles.compactProfileImage}
+          />
+          <View style={styles.compactProfileInfo}>
+            <Text style={styles.compactProfileName}>{guide.name}</Text>
+            <View style={styles.compactMetaRow}>
+              <MaterialCommunityIcons name="star" size={13} color="#FFC107" />
+              <Text style={styles.compactMetaText}>{guide.rating}</Text>
+              <Text style={styles.compactMetaDot}>•</Text>
+              <Text style={styles.compactMetaText}>{guide.experience} exp</Text>
+            </View>
+          </View>
+          {guide.verified ? (
+            <MaterialCommunityIcons name="check-circle" size={18} color="#2BC7B2" />
+          ) : null}
+        </View>
+
         {/* Profile Card */}
         <View style={styles.profileCard}>
           <View style={styles.profileHeader}>
@@ -387,6 +416,10 @@ export function GuideProfile({ guide, onBack, onBook, onMessage }: GuideProfileP
 
       {/* Booking Actions */}
       <View style={styles.footer}>
+        <TouchableOpacity style={styles.shareButton} onPress={() => void handleShareProfile()}>
+          <MaterialCommunityIcons name="share-variant-outline" size={20} color="#1B73E8" />
+          <Text style={styles.shareButtonText}>Share Profile</Text>
+        </TouchableOpacity>
         <TouchableOpacity
           style={styles.messageButton}
           onPress={handleMessageGuide}
@@ -435,6 +468,48 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 16,
     marginTop: -16,
+  },
+  compactProfileCard: {
+    marginTop: 12,
+    marginBottom: 12,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  compactProfileImage: {
+    width: 54,
+    height: 54,
+    borderRadius: 10,
+  },
+  compactProfileInfo: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  compactProfileName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 3,
+  },
+  compactMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  compactMetaText: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  compactMetaDot: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginHorizontal: 2,
   },
   profileCard: {
     backgroundColor: '#fff',
@@ -700,6 +775,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#1B73E8',
     backgroundColor: '#fff',
+  },
+  shareButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#93C5FD',
+    backgroundColor: '#EFF6FF',
+  },
+  shareButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1B73E8',
   },
   messageButtonText: {
     fontSize: 16,
