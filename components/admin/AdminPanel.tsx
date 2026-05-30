@@ -1,8 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useState } from "react";
 import {
-    Alert,
     Image,
     ScrollView,
     StyleSheet,
@@ -31,7 +29,6 @@ interface AdminPanelProps {
 }
 
 export function AdminPanel({ onNavigate, onLogout }: AdminPanelProps) {
-  const [displayPhoto, setDisplayPhoto] = useState("");
   const [analytics, setAnalytics] = useState({
     totalUsers: 1247,
     userGrowth: 12.5,
@@ -41,6 +38,8 @@ export function AdminPanel({ onNavigate, onLogout }: AdminPanelProps) {
     totalHotels: 89,
     pendingGuideVerifications: 8,
     pendingHotelVerifications: 4,
+    pendingDestinationRequests: 0,
+    totalDestinations: 0,
     activeIncidents: 3,
     activeSOSReports: 0,
   });
@@ -48,7 +47,11 @@ export function AdminPanel({ onNavigate, onLogout }: AdminPanelProps) {
   useEffect(() => {
     const loadDashboard = async () => {
       try {
-        const response = await adminAPI.getDashboard();
+        const [response, destinationResponse, requestResponse] = await Promise.all([
+          adminAPI.getDashboard(),
+          adminAPI.getDestinations(),
+          adminAPI.getDestinationRequests(),
+        ]);
         const data = response?.data || {};
         const overview = data?.overview || {};
         const usersByRole = overview?.usersByRole || {};
@@ -56,6 +59,9 @@ export function AdminPanel({ onNavigate, onLogout }: AdminPanelProps) {
         const verifications = data?.verifications || {};
         const incidents = data?.incidents || {};
         const growth = data?.growth || {};
+
+        const destinationCount = Number(destinationResponse?.data?.count || 0);
+        const destinationRequests = (requestResponse?.data?.requests || []) as { status?: string }[];
 
         setAnalytics({
           totalUsers: Number(overview?.totalUsers || 0),
@@ -66,6 +72,10 @@ export function AdminPanel({ onNavigate, onLogout }: AdminPanelProps) {
           totalHotels: Number(usersByRole?.hotels || 0),
           pendingGuideVerifications: Number(verifications?.pendingGuideVerifications || 0),
           pendingHotelVerifications: Number(verifications?.pendingHotelVerifications || 0),
+          pendingDestinationRequests: destinationRequests.filter(
+            (request) => request.status === "pending"
+          ).length,
+          totalDestinations: destinationCount,
           activeIncidents: Number(incidents?.activeIncidents || 0),
           activeSOSReports: Number(incidents?.activeSOSReports || 0),
         });
@@ -77,20 +87,10 @@ export function AdminPanel({ onNavigate, onLogout }: AdminPanelProps) {
     void loadDashboard();
   }, []);
 
-  const pickDisplayPhoto = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets.length > 0) {
-      setDisplayPhoto(result.assets[0].uri);
-      Alert.alert("Updated", "Display picture updated for admin profile.");
-    }
-  };
-
   const pendingVerifications =
-    analytics.pendingGuideVerifications + analytics.pendingHotelVerifications;
+    analytics.pendingGuideVerifications +
+    analytics.pendingHotelVerifications +
+    analytics.pendingDestinationRequests;
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -99,15 +99,10 @@ export function AdminPanel({ onNavigate, onLogout }: AdminPanelProps) {
         <View style={styles.headerTop}>
           <View style={styles.profileHeaderBlock}>
             <Image
-              source={{
-                uri:
-                  displayPhoto || "https://images.unsplash.com/photo-1556157382-97eda2d62296?w=300&q=80",
-              }}
-              style={styles.profileAvatar}
+              source={require("../../assets/images/logo_white.png")}
+              style={styles.appLogo}
+              resizeMode="contain"
             />
-            <TouchableOpacity style={styles.photoAction} onPress={() => void pickDisplayPhoto()}>
-              <Text style={styles.photoActionText}>Change Display Picture</Text>
-            </TouchableOpacity>
             <Text style={styles.headerTitle}>Admin Dashboard</Text>
           </View>
           <TouchableOpacity style={styles.logoutButton} onPress={onLogout}>
@@ -291,6 +286,28 @@ export function AdminPanel({ onNavigate, onLogout }: AdminPanelProps) {
                 </Text>
               </View>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionCard, styles.actionCardBlue]}
+              onPress={() => onNavigate("destination-requests")}
+            >
+              <View style={styles.actionLeft}>
+                <MaterialCommunityIcons
+                  name="map-marker-plus"
+                  size={20}
+                  color="#1D4ED8"
+                />
+                <View style={styles.actionInfo}>
+                  <Text style={styles.actionTitle}>Destination Requests</Text>
+                  <Text style={styles.actionSubtitle}>
+                    {analytics.pendingDestinationRequests} pending destination approvals
+                  </Text>
+                </View>
+              </View>
+              <View style={[styles.actionBadge, styles.actionBadgeBlue]}>
+                <Text style={styles.actionBadgeText}>{analytics.pendingDestinationRequests}</Text>
+              </View>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -315,6 +332,23 @@ export function AdminPanel({ onNavigate, onLogout }: AdminPanelProps) {
             <Text style={styles.managementSubtitle}>Manage all users</Text>
           </TouchableOpacity>
 
+          <TouchableOpacity
+            style={styles.managementCard}
+            onPress={() => onNavigate("destination-management")}
+          >
+            <View style={[styles.managementIcon, styles.managementIconOrange]}>
+              <MaterialCommunityIcons
+                name="map-marker-multiple"
+                size={24}
+                color="#FFFFFF"
+              />
+            </View>
+            <Text style={styles.managementTitle}>Destinations</Text>
+            <Text style={styles.managementSubtitle}>
+              {analytics.totalDestinations} official places
+            </Text>
+          </TouchableOpacity>
+
           {/* Bookings */}
           <TouchableOpacity
             style={styles.managementCard}
@@ -336,7 +370,7 @@ export function AdminPanel({ onNavigate, onLogout }: AdminPanelProps) {
             style={styles.managementCard}
             onPress={() => onNavigate("analytics")}
           >
-            <View style={[styles.managementIcon, styles.managementIconPurple]}>
+            <View style={[styles.managementIcon, styles.managementIconBlue]}>
               <MaterialCommunityIcons
                 name="trending-up"
                 size={24}
@@ -432,7 +466,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F9FAFB",
   },
   header: {
-    backgroundColor: "#9333EA",
+    backgroundColor: "#1B73E8",
     paddingTop: 48,
     paddingBottom: 32,
     paddingHorizontal: 24,
@@ -448,26 +482,10 @@ const styles = StyleSheet.create({
   profileHeaderBlock: {
     alignItems: "flex-start",
   },
-  profileAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginBottom: 8,
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.7)",
-  },
-  photoAction: {
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.45)",
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+  appLogo: {
+    width: 48,
+    height: 48,
     marginBottom: 10,
-  },
-  photoActionText: {
-    color: "#fff",
-    fontSize: 11,
-    fontWeight: "700",
   },
   headerTitle: {
     color: "#FFFFFF",
@@ -540,7 +558,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   metricCardPurple: {
-    backgroundColor: "#FAF5FF",
+    backgroundColor: "#DBEAFE",
     borderRadius: 12,
     padding: 16,
   },
@@ -571,7 +589,7 @@ const styles = StyleSheet.create({
     color: "#0D9488",
   },
   metricValuePurple: {
-    color: "#9333EA",
+    color: "#1D4ED8",
   },
   metricValueIndigo: {
     color: "#4F46E5",
@@ -696,11 +714,11 @@ const styles = StyleSheet.create({
   managementIconTeal: {
     backgroundColor: "#14B8A6",
   },
-  managementIconPurple: {
-    backgroundColor: "#A855F7",
-  },
   managementIconIndigo: {
     backgroundColor: "#6366F1",
+  },
+  managementIconOrange: {
+    backgroundColor: "#F97316",
   },
   managementTitle: {
     fontSize: 16,

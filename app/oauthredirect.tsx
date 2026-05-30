@@ -19,7 +19,7 @@ export default function OAuthRedirectScreen() {
           console.error("OAuth error:", error);
           setStatusText("Authentication failed. Please try again.");
           setTimeout(() => {
-            router.replace('/login');
+            router.replace('/');
           }, 2000);
           return;
         }
@@ -31,20 +31,20 @@ export default function OAuthRedirectScreen() {
           
           // Redirect back to login screen
           setTimeout(() => {
-            router.replace('/login');
+            router.replace('/');
           }, 1000);
         } else {
           console.error("No ID token found in redirect");
           setStatusText("Authentication failed. No token received.");
           setTimeout(() => {
-            router.replace('/login');
+            router.replace('/');
           }, 2000);
         }
       } catch (error) {
         console.error("OAuth redirect error:", error);
         setStatusText("An error occurred. Please try again.");
         setTimeout(() => {
-          router.replace('/login');
+          router.replace('/');
         }, 2000);
       }
     };

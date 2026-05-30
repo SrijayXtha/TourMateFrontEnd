@@ -333,6 +333,10 @@ const styles = StyleSheet.create({
   imageContainer: {
     position: 'relative',
     height: 300,
+    marginTop: -18,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: 'hidden',
   },
   headerImage: {
     width: '100%',

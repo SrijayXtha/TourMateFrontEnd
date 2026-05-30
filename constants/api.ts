@@ -1,4 +1,6 @@
 import axios from 'axios';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import {
     clearFirebaseSession,
     ensureFirebaseSession,
@@ -14,13 +16,70 @@ try {
   console.warn('AsyncStorage not available - install @react-native-async-storage/async-storage');
 }
 
+const webStorage = typeof window !== 'undefined' ? window.localStorage : null;
+
+const getExpoHostName = (): string | null => {
+  const candidates = [
+    Constants.expoConfig?.hostUri,
+    (Constants as any)?.manifest2?.extra?.expoGo?.debuggerHost,
+    (Constants as any)?.manifest?.debuggerHost,
+  ];
+
+  for (const candidate of candidates) {
+    const value = String(candidate || '').trim();
+    if (!value) {
+      continue;
+    }
+
+    const host = value.split(':')[0]?.trim();
+    if (host) {
+      return host;
+    }
+  }
+
+  return null;
+};
+
+const normalizeNativeApiUrl = (url: string): string => {
+  const normalizedUrl = url.replace(/\/+$/, '');
+
+  if (Platform.OS === 'web') {
+    return normalizedUrl;
+  }
+
+  try {
+    const parsed = new URL(normalizedUrl);
+    const hostname = parsed.hostname.trim().toLowerCase();
+    const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1';
+
+    if (!isLocalHost) {
+      return normalizedUrl;
+    }
+
+    if (Platform.OS === 'android') {
+      parsed.hostname = '10.0.2.2';
+      return parsed.toString().replace(/\/+$/, '');
+    }
+
+    const expoHost = getExpoHostName();
+    if (expoHost) {
+      parsed.hostname = expoHost;
+      return parsed.toString().replace(/\/+$/, '');
+    }
+  } catch (error) {
+    console.warn('Unable to normalize native API URL:', error);
+  }
+
+  return normalizedUrl;
+};
+
 // Backend API Configuration
 // Automatically detects the correct URL based on environment
 const getApiUrl = (): string => {
   // Priority 1: Environment variable (highest priority)
   const envUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
   if (envUrl) {
-    const normalizedEnvUrl = envUrl.replace(/\/+$/, '');
+    const normalizedEnvUrl = normalizeNativeApiUrl(envUrl);
     console.log('📡 Using API URL from EXPO_PUBLIC_API_URL:', normalizedEnvUrl);
     return normalizedEnvUrl;
   }
@@ -69,19 +128,25 @@ export const api = axios.create({
 // Token Management Utils
 export const TokenManager = {
   async setToken(token: string) {
-    if (!AsyncStorage) return;
     try {
-      await AsyncStorage.setItem('auth_token', token);
+      if (AsyncStorage) {
+        await AsyncStorage.setItem('auth_token', token);
+        return;
+      }
+
+      webStorage?.setItem('auth_token', token);
     } catch (error) {
       console.error('Failed to store auth token:', error);
     }
   },
 
   async getToken(): Promise<string | null> {
-    if (!AsyncStorage) return null;
     try {
-      const token = await AsyncStorage.getItem('auth_token');
-      return token;
+      if (AsyncStorage) {
+        return await AsyncStorage.getItem('auth_token');
+      }
+
+      return webStorage?.getItem('auth_token') ?? null;
     } catch (error) {
       console.error('Failed to retrieve auth token:', error);
       return null;
@@ -89,27 +154,37 @@ export const TokenManager = {
   },
 
   async clearToken() {
-    if (!AsyncStorage) return;
     try {
-      await AsyncStorage.removeItem('auth_token');
+      if (AsyncStorage) {
+        await AsyncStorage.removeItem('auth_token');
+        return;
+      }
+
+      webStorage?.removeItem('auth_token');
     } catch (error) {
       console.error('Failed to clear auth token:', error);
     }
   },
 
   async setUser(user: any) {
-    if (!AsyncStorage) return;
     try {
-      await AsyncStorage.setItem('auth_user', JSON.stringify(user));
+      const serialized = JSON.stringify(user);
+      if (AsyncStorage) {
+        await AsyncStorage.setItem('auth_user', serialized);
+        return;
+      }
+
+      webStorage?.setItem('auth_user', serialized);
     } catch (error) {
       console.error('Failed to store user data:', error);
     }
   },
 
   async getUser(): Promise<any | null> {
-    if (!AsyncStorage) return null;
     try {
-      const user = await AsyncStorage.getItem('auth_user');
+      const user = AsyncStorage
+        ? await AsyncStorage.getItem('auth_user')
+        : webStorage?.getItem('auth_user');
       return user ? JSON.parse(user) : null;
     } catch (error) {
       console.error('Failed to retrieve user data:', error);
@@ -118,16 +193,19 @@ export const TokenManager = {
   },
 
   async clearUser() {
-    if (!AsyncStorage) return;
     try {
-      await AsyncStorage.removeItem('auth_user');
+      if (AsyncStorage) {
+        await AsyncStorage.removeItem('auth_user');
+        return;
+      }
+
+      webStorage?.removeItem('auth_user');
     } catch (error) {
       console.error('Failed to clear user data:', error);
     }
   },
 
   async logout() {
-    if (!AsyncStorage) return;
     await this.clearToken();
     await this.clearUser();
   },
@@ -228,6 +306,16 @@ const syncRealtimeIdentity = async (params?: {
   await registerRealtimePresenceForUser(userProfile);
 };
 
+const mergeStoredUser = async (updates: Record<string, unknown>) => {
+  const currentUser = (await TokenManager.getUser()) || {};
+  const mergedUser = {
+    ...currentUser,
+    ...updates,
+  };
+  await TokenManager.setUser(mergedUser);
+  return mergedUser;
+};
+
 // Add auth token to requests
 api.interceptors.request.use(
   async (config) => {
@@ -244,23 +332,65 @@ api.interceptors.request.use(
 export const authAPI = {
   register: async (userData: {
     fullName: string;
+    username?: string;
     email: string;
     password: string;
+    profilePhoto?: string;
     phone: string;
     role: string;
+    emergencyContact?: string;
+    preferences?: string[];
+    specialization?: string;
+    destinations?: number[];
+    languages?: string[];
+    licenseDocument?: {
+      name: string;
+      uri: string;
+    };
     experienceYears?: string;
     businessName?: string;
+    registrationNumber?: string;
+    hotelLicense?: {
+      name: string;
+      uri: string;
+    };
+    hotelLocation?: {
+      latitude: number;
+      longitude: number;
+      address: string;
+    };
   }) => {
-    const response = await api.post('/auth/register', userData);
+    const response = await api.post('/auth/register', {
+      full_name: userData.fullName,
+      username: userData.username,
+      email: userData.email,
+      password: userData.password,
+      profilePhoto: userData.profilePhoto,
+      phone: userData.phone,
+      role: userData.role,
+      emergencyContact: userData.emergencyContact,
+      preferences: userData.preferences,
+      specialization: userData.specialization,
+      destinations: userData.destinations,
+      languages: userData.languages,
+      licenseDocument: userData.licenseDocument,
+      experienceYears: userData.experienceYears,
+      businessName: userData.businessName,
+      registrationNumber: userData.registrationNumber,
+      hotelLicense: userData.hotelLicense,
+      hotelLocation: userData.hotelLocation,
+    });
+    const token = response.data?.data?.token || response.data?.token;
+    const user = response.data?.data?.user || response.data?.user;
     // Store token and user data on successful registration
-    if (response.data.status === 'success' && response.data.data?.token) {
-      await TokenManager.setToken(response.data.data.token);
-      await TokenManager.setUser(response.data.data.user);
+    if (token && user) {
+      await TokenManager.setToken(token);
+      await TokenManager.setUser(user);
       await syncRealtimeIdentity({
         email: userData.email,
         password: userData.password,
         fullName: userData.fullName,
-        user: response.data.data.user,
+        user,
       });
     }
     return response.data;
@@ -268,15 +398,17 @@ export const authAPI = {
 
   login: async (credentials: { email: string; password: string }) => {
     const response = await api.post('/auth/login', credentials);
+    const token = response.data?.data?.token || response.data?.token;
+    const user = response.data?.data?.user || response.data?.user;
     // Store token and user data on successful login
-    if (response.data.status === 'success' && response.data.data?.token) {
-      await TokenManager.setToken(response.data.data.token);
-      await TokenManager.setUser(response.data.data.user);
+    if (token && user) {
+      await TokenManager.setToken(token);
+      await TokenManager.setUser(user);
       await syncRealtimeIdentity({
         email: credentials.email,
         password: credentials.password,
-        fullName: response.data.data.user?.fullName,
-        user: response.data.data.user,
+        fullName: user?.fullName || user?.full_name,
+        user,
       });
     }
     return response.data;
@@ -284,15 +416,55 @@ export const authAPI = {
 
   googleLogin: async (payload: { idToken: string; role?: string }) => {
     const response = await api.post('/auth/google', payload);
+    const token = response.data?.data?.token || response.data?.token;
+    const user = response.data?.data?.user || response.data?.user;
     // Store token and user data on successful Google login
-    if (response.data.status === 'success' && response.data.data?.token) {
-      await TokenManager.setToken(response.data.data.token);
-      await TokenManager.setUser(response.data.data.user);
+    if (token && user) {
+      await TokenManager.setToken(token);
+      await TokenManager.setUser(user);
       await syncRealtimeIdentity({
-        fullName: response.data.data.user?.fullName,
-        user: response.data.data.user,
+        fullName: user?.fullName || user?.full_name,
+        user,
       });
     }
+    return response.data;
+  },
+
+  completeGoogleOnboarding: async (payload: {
+    fullName: string;
+    username: string;
+    phone: string;
+    password: string;
+    emergencyContact: string;
+    preferences: string[];
+  }) => {
+    const response = await api.patch('/auth/google/onboarding', payload);
+    const token = response.data?.data?.token || response.data?.token;
+    const user = response.data?.data?.user || response.data?.user;
+    if (token && user) {
+      await TokenManager.setToken(token);
+      await TokenManager.setUser(user);
+      await syncRealtimeIdentity({
+        email: user?.email,
+        password: payload.password,
+        fullName: payload.fullName,
+        user,
+      });
+    }
+    return response.data;
+  },
+
+  createGuideDestinationRequest: async (payload: {
+    requesterName: string;
+    requesterEmail: string;
+    destinationName: string;
+    location: string;
+    reason: string;
+    image?: string;
+    latitude?: number;
+    longitude?: number;
+  }) => {
+    const response = await api.post('/auth/guide-destination-requests', payload);
     return response.data;
   },
 
@@ -339,11 +511,17 @@ export const touristAPI = {
 
   updateProfile: async (payload: {
     fullName?: string;
+    username?: string;
     phone?: string;
     emergencyContact?: string;
     preferences?: string[];
   }) => {
     const response = await api.patch('/tourist/profile', payload);
+    await mergeStoredUser({
+      ...(payload.fullName !== undefined ? { full_name: payload.fullName, fullName: payload.fullName } : {}),
+      ...(payload.username !== undefined ? { username: payload.username } : {}),
+      ...(payload.phone !== undefined ? { phone: payload.phone } : {}),
+    });
     return response.data;
   },
 
@@ -473,6 +651,65 @@ export const touristAPI = {
     const response = await api.get('/tourist/reviews');
     return response.data;
   },
+
+  getDashboard: async () => {
+    const response = await api.get('/tourist/dashboard');
+    return response.data;
+  },
+};
+
+export const publicAPI = {
+  getDestinations: async () => {
+    const response = await api.get('/destinations');
+    return response.data;
+  },
+
+  getGuides: async (
+    params?:
+      | number
+      | {
+          page?: number;
+          limit?: number;
+          search?: string;
+          destinationId?: number | string;
+          language?: string;
+          specialization?: string;
+        },
+    legacyLimit?: number
+  ) => {
+    const normalizedParams =
+      typeof params === 'number'
+        ? { page: params, limit: legacyLimit || 10 }
+        : params || {};
+    const response = await api.get('/public/guides', {
+      params: normalizedParams,
+    });
+    return response.data;
+  },
+
+  getGuideDetails: async (guideId: number | string) => {
+    const response = await api.get(`/public/guides/${guideId}`);
+    return response.data;
+  },
+
+  getHotels: async (page = 1, limit = 10) => {
+    const response = await api.get('/public/hotels', {
+      params: { page, limit },
+    });
+    return response.data;
+  },
+
+  getHotelDetails: async (hotelId: number | string) => {
+    const response = await api.get(`/public/hotels/${hotelId}`);
+    return response.data;
+  },
+
+  search: async (query: string, type: 'all' | 'guides' | 'hotels' = 'all') => {
+    const response = await api.get('/public/search', {
+      params: { q: query, type },
+    });
+    return response.data;
+  },
 };
 
 export const guideAPI = {
@@ -572,6 +809,23 @@ export const guideAPI = {
 
   sendMessage: async (payload: { receiverId?: number; bookingId?: number; content: string }) => {
     const response = await api.post('/guide/messages', payload);
+    return response.data;
+  },
+
+  getDestinationRequests: async () => {
+    const response = await api.get('/guide/destination-requests');
+    return response.data;
+  },
+
+  createDestinationRequest: async (payload: {
+    destinationName: string;
+    location: string;
+    reason: string;
+    image?: string;
+    latitude?: number;
+    longitude?: number;
+  }) => {
+    const response = await api.post('/guide/destination-requests', payload);
     return response.data;
   },
 };
@@ -700,6 +954,77 @@ export const adminAPI = {
     return response.data;
   },
 
+  getDestinations: async () => {
+    const response = await api.get('/admin/destinations');
+    return response.data;
+  },
+
+  createDestination: async (payload: {
+    name: string;
+    location: string;
+    latitude?: number;
+    longitude?: number;
+    description?: string;
+    image?: string;
+    category?: string;
+    popularityScore?: number;
+    difficulty?: string;
+    duration?: string;
+    bestTime?: string;
+    pricePerDayNpr?: number;
+    activities?: string[];
+    highlights?: string[];
+  }) => {
+    const response = await api.post('/admin/destinations', payload);
+    return response.data;
+  },
+
+  updateDestination: async (
+    destinationId: number,
+    payload: {
+      name?: string;
+      location?: string;
+      latitude?: number;
+      longitude?: number;
+      description?: string;
+      image?: string;
+      category?: string;
+      popularityScore?: number;
+      difficulty?: string;
+      duration?: string;
+      bestTime?: string;
+      pricePerDayNpr?: number;
+      activities?: string[];
+      highlights?: string[];
+    }
+  ) => {
+    const response = await api.put(`/admin/destinations/${destinationId}`, payload);
+    return response.data;
+  },
+
+  deleteDestination: async (destinationId: number) => {
+    const response = await api.delete(`/admin/destinations/${destinationId}`);
+    return response.data;
+  },
+
+  getDestinationRequests: async () => {
+    const response = await api.get('/admin/destination-requests');
+    return response.data;
+  },
+
+  approveDestinationRequest: async (
+    requestId: number,
+    payload?: { category?: string; popularityScore?: number }
+  ) => {
+    const response = await api.patch(`/admin/destination-requests/${requestId}/approve`, payload || {});
+    return response.data;
+  },
+
+  rejectDestinationRequest: async (requestId: number, reason: string) => {
+    const response = await api.patch(`/admin/destination-requests/${requestId}/reject`, { reason });
+    return response.data;
+  },
+
   getPendingHotels: async () => {
     const response = await api.get('/admin/hotels/pending-verification');
     return response.data;
@@ -762,9 +1087,19 @@ api.interceptors.response.use(
       }
 
       // Server responded with error status
+      const detail = error.response.data?.error;
+      const responseMessage =
+        error.response.data?.message ||
+        error.response.data?.error?.message ||
+        error.response.statusText ||
+        `Request failed with status ${error.response.status}`;
       return Promise.reject({
-        message: error.response.data.message || 'An error occurred',
+        message:
+          typeof detail === 'string' && detail
+            ? `${responseMessage}: ${detail}`
+            : responseMessage,
         status: error.response.status,
+        errors: error.response.data?.errors,
       });
     } else if (error.request) {
       // Request made but no response
@@ -1516,6 +1851,43 @@ if (IS_DEMO_MODE) {
     return demoSuccess('Bookings retrieved (demo)', {
       count: bookings.length,
       bookings,
+    });
+  };
+
+  touristAPI.getDashboard = async () => {
+    const user = await getCurrentDemoUserRecord();
+    const settings = ensureTouristSettings(user.id);
+    const bookings = demoBookings.filter((booking) => booking.touristId === user.id);
+    const activeBookings = bookings.filter(
+      (booking) => booking.status === 'confirmed' || booking.status === 'ongoing'
+    );
+    const reviews = demoTouristReviewsByTourist[user.id] || [];
+
+    return demoSuccess('Dashboard data retrieved (demo)', {
+      user: {
+        full_name: user.fullName,
+        email: user.email,
+      },
+      stats: {
+        activeTrips: activeBookings.length,
+        totalBookings: bookings.length,
+        totalReviews: reviews.length,
+        savedPlaces: settings.savedPlaces.length,
+      },
+      activeBookings: activeBookings.slice(0, 5).map((booking) => {
+        const guideUser = booking.guideId ? demoUsers.find((item) => item.id === booking.guideId) : null;
+        const hotelProfile = booking.hotelId ? demoHotelProfiles[booking.hotelId] : null;
+
+        return {
+          id: booking.id,
+          startDate: booking.startDate,
+          endDate: booking.endDate,
+          status: booking.status,
+          totalPrice: booking.totalPrice,
+          guideName: guideUser?.fullName || 'Guide',
+          hotelName: hotelProfile?.hotelName || 'Hotel',
+        };
+      }),
     });
   };
 

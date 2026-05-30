@@ -10,7 +10,6 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { mockGuides, mockHotels } from '../../data/mockData';
 import { TouristTopBar } from '../common/TouristTopBar';
 
 interface Destination {
@@ -55,55 +54,9 @@ export function DestinationDetails({ destination, onBack, onNavigate }: Destinat
     return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
   };
 
-  const normalize = (value?: string) =>
-    String(value || '')
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-  const tokenize = (value?: string) =>
-    normalize(value)
-      .split(' ')
-      .filter((token) => token.length >= 3 && token !== 'nepal');
-
-  const destinationLocationTokens = Array.from(new Set(tokenize(destination.location)));
   const minimumDurationDays = getMinimumDurationDays(destination.duration);
-  const destinationThemeTokens = Array.from(
-    new Set(
-      [destination.name, destination.category, ...destination.activities].flatMap((entry) =>
-        tokenize(entry)
-      )
-    )
-  );
-
-  // Match guides by destination location first; if absent, fallback to relevant specialties.
-  const availableGuides = mockGuides.filter((guide: any) => {
-    if (!guide.verified) {
-      return false;
-    }
-
-    const specialityLocations = Array.isArray(guide.specialityLocations)
-      ? guide.specialityLocations
-      : [];
-
-    const guideSearchText = normalize(
-      [guide.location, guide.bio, ...(guide.specialties || []), ...specialityLocations].join(' ')
-    );
-
-    const hasLocationMatch = destinationLocationTokens.some((token) =>
-      guideSearchText.includes(token)
-    );
-
-    if (hasLocationMatch) {
-      return true;
-    }
-
-    return destinationThemeTokens.some((token) => guideSearchText.includes(token));
-  });
-
-  // Get nearby hotels (mock for now)
-  const nearbyHotels = mockHotels.slice(0, 2);
+  const availableGuides: any[] = [];
+  const nearbyHotels: any[] = [];
 
   const handleExploreHotels = () => {
     Alert.alert(
@@ -134,8 +87,12 @@ export function DestinationDetails({ destination, onBack, onNavigate }: Destinat
 
       {/* Content */}
       <ScrollView
+        style={styles.contentScroll}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        bounces={false}
+        alwaysBounceVertical={false}
+        overScrollMode="never"
       >
         {/* Header Image */}
         <View style={styles.imageContainer}>
@@ -368,12 +325,12 @@ export function DestinationDetails({ destination, onBack, onNavigate }: Destinat
           {/* Package Info */}
           <View style={styles.packageCard}>
             <View style={styles.packageHeader}>
-              <MaterialCommunityIcons name="currency-usd" size={20} color="#1E3A8A" />
+              <MaterialCommunityIcons name="cash" size={20} color="#1E3A8A" />
               <Text style={styles.packageTitle}>Package Information</Text>
             </View>
             <Text style={styles.packageText}>
-              Base package starts from{' '}
-              <Text style={styles.packagePrice}>{destination.price}</Text> per person
+              Base guide package starts from{" "}
+              <Text style={styles.packagePrice}>{destination.price}</Text> per day
             </Text>
             <Text style={styles.packageNote}>
               💡 <Text style={styles.packageNoteStrong}>Note:</Text> Select a local guide
@@ -397,6 +354,11 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     position: 'relative',
+    marginTop: 0,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    overflow: 'hidden',
+    backgroundColor: '#1B73E8',
   },
   headerImage: {
     width: '100%',
@@ -429,6 +391,9 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingBottom: 20,
+  },
+  contentScroll: {
+    marginTop: 0,
   },
   contentPadding: {
     paddingHorizontal: 16,

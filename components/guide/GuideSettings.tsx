@@ -20,16 +20,15 @@ interface GuideSettingsProps {
   onLogout: () => void;
 }
 
-const REGISTERED_GUIDE_LOCATIONS = [
-  "Kathmandu Valley",
-  "Pokhara",
-  "Sagarmatha",
-  "Annapurna Region",
-  "Chitwan National Park",
-  "Lumbini",
-  "Nagarkot",
-  "Mustang",
-];
+interface GuideDestinationRequestItem {
+  requestId: number;
+  destinationName: string;
+  location: string;
+  reason: string;
+  status: string;
+  rejectionReason?: string | null;
+  approvedDestinationName?: string | null;
+}
 
 export function GuideSettings({ onBack, onLogout }: GuideSettingsProps) {
   const [loading, setLoading] = useState(true);
@@ -40,18 +39,32 @@ export function GuideSettings({ onBack, onLogout }: GuideSettingsProps) {
   const [specialityLocation, setSpecialityLocation] = useState("");
   const [isAvailable, setIsAvailable] = useState(true);
   const [verifiedStatus, setVerifiedStatus] = useState(false);
+  const [languages, setLanguages] = useState<string[]>([]);
+  const [destinations, setDestinations] = useState<{ destinationId: number; name: string }[]>([]);
+  const [destinationRequests, setDestinationRequests] = useState<GuideDestinationRequestItem[]>([]);
+  const [requestName, setRequestName] = useState("");
+  const [requestLocation, setRequestLocation] = useState("");
+  const [requestReason, setRequestReason] = useState("");
+  const [requestSubmitting, setRequestSubmitting] = useState(false);
 
   const loadProfile = async () => {
     setLoading(true);
     try {
-      const response = await guideAPI.getProfile();
+      const [response, requestResponse] = await Promise.all([
+        guideAPI.getProfile(),
+        guideAPI.getDestinationRequests(),
+      ]);
       const profile = response?.data?.guide || {};
+      const userProfilePhoto = String(response?.data?.profile_photo || "").trim();
       setBio(profile.bio || "");
-      setDisplayPhoto(profile.photo || "");
+      setDisplayPhoto(profile.photo || userProfilePhoto || "");
       setExperienceYears(String(profile.experienceYears || 0));
       setSpecialityLocation(profile.specialityLocation || "");
       setIsAvailable(Boolean(profile.isAvailable ?? true));
       setVerifiedStatus(Boolean(profile.verifiedStatus));
+      setLanguages((profile.languages || []) as string[]);
+      setDestinations((profile.destinations || []) as { destinationId: number; name: string }[]);
+      setDestinationRequests((requestResponse?.data?.requests || []) as GuideDestinationRequestItem[]);
     } catch (error: any) {
       Alert.alert("Error", error?.message || "Failed to load guide profile");
     } finally {
@@ -96,11 +109,37 @@ export function GuideSettings({ onBack, onLogout }: GuideSettingsProps) {
         specialityLocation: normalizedLocation,
       });
       await guideAPI.updateAvailability(isAvailable);
-      Alert.alert("Success", "Guide profile updated");
+      await loadProfile();
+      Alert.alert("Changes Saved", "Your profile changes have been saved.");
     } catch (error: any) {
       Alert.alert("Update Failed", error?.message || "Unable to update guide profile");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const submitDestinationRequest = async () => {
+    if (!requestName.trim() || !requestLocation.trim() || !requestReason.trim()) {
+      Alert.alert("Validation", "Destination name, location, and reason are required.");
+      return;
+    }
+
+    setRequestSubmitting(true);
+    try {
+      await guideAPI.createDestinationRequest({
+        destinationName: requestName.trim(),
+        location: requestLocation.trim(),
+        reason: requestReason.trim(),
+      });
+      setRequestName("");
+      setRequestLocation("");
+      setRequestReason("");
+      await loadProfile();
+      Alert.alert("Request Sent", "Your destination request has been submitted for admin review.");
+    } catch (error: any) {
+      Alert.alert("Request Failed", error?.message || "Unable to submit destination request.");
+    } finally {
+      setRequestSubmitting(false);
     }
   };
 
@@ -199,6 +238,32 @@ export function GuideSettings({ onBack, onLogout }: GuideSettingsProps) {
               : "Choose your main service location so tourists can find you by place."}
           </Text>
 
+          <Text style={styles.inputLabel}>Registered Destinations</Text>
+          <View style={styles.locationChipsContainer}>
+            {destinations.length > 0 ? (
+              destinations.map((destination) => (
+                <View key={destination.destinationId} style={styles.locationChipActive}>
+                  <Text style={styles.locationChipTextActive}>{destination.name}</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.locationHint}>No destinations registered yet.</Text>
+            )}
+          </View>
+
+          <Text style={styles.inputLabel}>Languages I Speak</Text>
+          <View style={styles.locationChipsContainer}>
+            {languages.length > 0 ? (
+              languages.map((language) => (
+                <View key={language} style={styles.languageChip}>
+                  <Text style={styles.languageChipText}>{language}</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.locationHint}>No languages saved yet.</Text>
+            )}
+          </View>
+
           <View style={styles.toggleRow}>
             <View>
               <Text style={styles.toggleTitle}>Available For Bookings</Text>
@@ -214,6 +279,88 @@ export function GuideSettings({ onBack, onLogout }: GuideSettingsProps) {
           >
             <Text style={styles.primaryButtonText}>{saving ? "Saving..." : "Save Changes"}</Text>
           </TouchableOpacity>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Request New Destination</Text>
+          <Text style={styles.locationHint}>
+            Can&apos;t find a place you guide for? Send a destination request to admin.
+          </Text>
+          <Text style={styles.inputLabel}>Destination Name</Text>
+          <TextInput
+            style={styles.input}
+            value={requestName}
+            onChangeText={setRequestName}
+            placeholder="e.g. Bandipur"
+          />
+          <Text style={styles.inputLabel}>Location / Address</Text>
+          <TextInput
+            style={styles.input}
+            value={requestLocation}
+            onChangeText={setRequestLocation}
+            placeholder="District or full location"
+          />
+          <Text style={styles.inputLabel}>Reason</Text>
+          <TextInput
+            style={[styles.input, styles.multilineInput]}
+            value={requestReason}
+            onChangeText={setRequestReason}
+            placeholder="Why should this destination be added?"
+            multiline
+          />
+          <TouchableOpacity
+            style={[styles.primaryButton, requestSubmitting && styles.disabledButton]}
+            onPress={() => void submitDestinationRequest()}
+            disabled={requestSubmitting}
+          >
+            <Text style={styles.primaryButtonText}>
+              {requestSubmitting ? "Submitting..." : "Submit Destination Request"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Destination Request Status</Text>
+          {destinationRequests.length > 0 ? (
+            destinationRequests.map((request) => (
+              <View key={request.requestId} style={styles.requestCard}>
+                <View style={styles.requestHeader}>
+                  <Text style={styles.requestName}>{request.destinationName}</Text>
+                  <View
+                    style={[
+                      styles.statusBadge,
+                      request.status === "approved" && styles.statusBadgeApproved,
+                      request.status === "rejected" && styles.statusBadgeRejected,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.statusText,
+                        request.status === "approved" && styles.statusTextApproved,
+                        request.status === "rejected" && styles.statusTextRejected,
+                      ]}
+                    >
+                      {request.status}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.requestMeta}>{request.location}</Text>
+                <Text style={styles.requestMeta}>{request.reason}</Text>
+                {request.approvedDestinationName ? (
+                  <Text style={styles.approvedText}>
+                    Added as official destination: {request.approvedDestinationName}
+                  </Text>
+                ) : null}
+                {request.rejectionReason ? (
+                  <Text style={styles.rejectedText}>
+                    Rejection reason: {request.rejectionReason}
+                  </Text>
+                ) : null}
+              </View>
+            ))
+          ) : (
+            <Text style={styles.locationHint}>No destination requests submitted yet.</Text>
+          )}
         </View>
 
         <View style={styles.card}>
@@ -315,6 +462,19 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     marginBottom: 12,
   },
+  languageChip: {
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: "#EFF6FF",
+  },
+  languageChipText: {
+    fontSize: 12,
+    color: "#1E40AF",
+    fontWeight: "600",
+  },
   toggleRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -335,6 +495,66 @@ const styles = StyleSheet.create({
   },
   disabledButton: { opacity: 0.6 },
   primaryButtonText: { color: "#fff", fontSize: 14, fontWeight: "700" },
+  requestCard: {
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+  },
+  requestHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 8,
+  },
+  requestName: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#111827",
+  },
+  requestMeta: {
+    fontSize: 12,
+    color: "#6B7280",
+    marginTop: 6,
+  },
+  statusBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: "#FEF3C7",
+  },
+  statusBadgeApproved: {
+    backgroundColor: "#DCFCE7",
+  },
+  statusBadgeRejected: {
+    backgroundColor: "#FEE2E2",
+  },
+  statusText: {
+    color: "#92400E",
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "capitalize",
+  },
+  statusTextApproved: {
+    color: "#166534",
+  },
+  statusTextRejected: {
+    color: "#B91C1C",
+  },
+  approvedText: {
+    fontSize: 12,
+    color: "#166534",
+    marginTop: 8,
+    fontWeight: "600",
+  },
+  rejectedText: {
+    fontSize: 12,
+    color: "#B91C1C",
+    marginTop: 8,
+    fontWeight: "600",
+  },
   logoutButton: {
     flexDirection: "row",
     alignItems: "center",

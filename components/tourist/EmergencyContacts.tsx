@@ -2,14 +2,12 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import {
     Alert,
-    Linking,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from "react-native";
-import { mockEmergencyContacts } from "../../data/mockData";
 import { TouristTopBar } from "../common/TouristTopBar";
 
 interface EmergencyContactsProps {
@@ -17,22 +15,6 @@ interface EmergencyContactsProps {
 }
 
 export function EmergencyContacts({ onBack }: EmergencyContactsProps) {
-  const handleCall = (name: string, number: string) => {
-    Alert.alert(
-      `Call ${name}?`,
-      `Do you want to call ${number}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Call",
-          onPress: () => {
-            Linking.openURL(`tel:${number}`);
-          },
-        },
-      ]
-    );
-  };
-
   const handleAddContact = () => {
     Alert.alert("Add Contact", "Custom contact feature coming soon!");
   };
@@ -68,64 +50,14 @@ export function EmergencyContacts({ onBack }: EmergencyContactsProps) {
           </View>
         </View>
 
-        {/* Emergency Numbers */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>EMERGENCY SERVICES</Text>
-          {mockEmergencyContacts
-            .filter((contact) => contact.type === "emergency")
-            .map((contact, index) => (
-              <View key={index} style={styles.contactCard}>
-                <View style={styles.contactLeft}>
-                  <View style={styles.emergencyIconContainer}>
-                    <MaterialCommunityIcons
-                      name="phone"
-                      size={24}
-                      color="#DC2626"
-                    />
-                  </View>
-                  <View style={styles.contactInfo}>
-                    <Text style={styles.contactName}>{contact.name}</Text>
-                    <Text style={styles.contactNumber}>{contact.number}</Text>
-                  </View>
-                </View>
-                <TouchableOpacity
-                  style={styles.callButton}
-                  onPress={() => handleCall(contact.name, contact.number)}
-                >
-                  <Text style={styles.callButtonText}>Call</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-        </View>
-
-        {/* Support Numbers */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>SUPPORT SERVICES</Text>
-          {mockEmergencyContacts
-            .filter((contact) => contact.type === "support")
-            .map((contact, index) => (
-              <View key={index} style={styles.contactCard}>
-                <View style={styles.contactLeft}>
-                  <View style={styles.supportIconContainer}>
-                    <MaterialCommunityIcons
-                      name="help-circle"
-                      size={24}
-                      color="#2563EB"
-                    />
-                  </View>
-                  <View style={styles.contactInfo}>
-                    <Text style={styles.contactName}>{contact.name}</Text>
-                    <Text style={styles.contactNumber}>{contact.number}</Text>
-                  </View>
-                </View>
-                <TouchableOpacity
-                  style={styles.callButtonOutline}
-                  onPress={() => handleCall(contact.name, contact.number)}
-                >
-                  <Text style={styles.callButtonOutlineText}>Call</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
+          <View style={styles.infoSection}>
+            <Text style={styles.infoTitle}>Live contacts not configured</Text>
+            <Text style={styles.warningSubtitle}>
+              Sample emergency numbers have been removed. Connect verified backend-managed contact
+              data before showing call shortcuts here.
+            </Text>
+          </View>
         </View>
 
         {/* Add Custom Contact */}

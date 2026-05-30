@@ -76,6 +76,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
+    overflow: "hidden",
   },
   actionsRow: {
     flexDirection: "row",

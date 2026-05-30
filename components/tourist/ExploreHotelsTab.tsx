@@ -1,37 +1,104 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { mockHotels } from '../../data/mockData';
+import { publicAPI } from '../../constants/api';
 
 interface ExploreHotelsTabProps {
   onNavigate: (screen: string, data?: any) => void;
 }
 
+interface HotelCard {
+  id: string;
+  name: string;
+  image: string;
+  rating: number;
+  location: string;
+  pricePerNight: string;
+  amenities: string[];
+  verified: boolean;
+  description?: string;
+  roomTypes?: string[];
+}
+
+const HOTEL_FALLBACK_IMAGES = [
+  'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=900&q=80',
+  'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=900&q=80',
+  'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=900&q=80',
+];
+
+const filters = ['All Hotels', 'Luxury', 'Budget', 'Boutique'];
+
+const toHotelCard = (hotel: any, index: number): HotelCard => ({
+  id: String(hotel.hotelId ?? hotel.id ?? index + 1),
+  name: String(hotel.name || 'Featured Stay'),
+  image: hotel.image || HOTEL_FALLBACK_IMAGES[index % HOTEL_FALLBACK_IMAGES.length],
+  rating: Number.parseFloat(String(hotel.avgRating ?? hotel.rating ?? '4.6')) || 4.6,
+  location: String(hotel.location || 'Nepal'),
+  pricePerNight: `NPR ${4500 + index * 700}/night`,
+  amenities: ['WiFi', 'Breakfast', 'Great Location'],
+  verified: true,
+  description: hotel.description || 'Comfortable stay with easy access to nearby attractions.',
+  roomTypes: ['Standard Room', 'Deluxe Room'],
+});
+
 export function ExploreHotelsTab({ onNavigate }: ExploreHotelsTabProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('All Hotels');
+  const [hotels, setHotels] = useState<HotelCard[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorText, setErrorText] = useState('');
 
-  const filters = ['All Hotels', 'Luxury', 'Budget', 'Boutique'];
+  useEffect(() => {
+    const loadHotels = async () => {
+      try {
+        setLoading(true);
+        setErrorText('');
+        const response = await publicAPI.getHotels(1, 20);
+        const items = ((response?.data?.hotels || []) as any[]).map(toHotelCard);
+        setHotels(items);
+      } catch (error: any) {
+        setHotels([]);
+        setErrorText(error?.message || 'Unable to load hotels right now.');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const filteredHotels = mockHotels.filter((hotel) => {
-    const matchesSearch = hotel.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         hotel.location.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = selectedFilter === 'All Hotels' || 
-                         hotel.name.toLowerCase().includes(selectedFilter.toLowerCase());
-    return matchesSearch && matchesFilter;
-  });
+    void loadHotels();
+  }, []);
+
+  const filteredHotels = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+
+    return hotels.filter((hotel) => {
+      const matchesFilter =
+        selectedFilter === 'All Hotels' ||
+        (selectedFilter === 'Luxury' && hotel.rating >= 4.8) ||
+        (selectedFilter === 'Budget' && hotel.pricePerNight.includes('4500')) ||
+        (selectedFilter === 'Boutique' &&
+          `${hotel.description} ${hotel.name}`.toLowerCase().includes('boutique'));
+
+      const matchesQuery =
+        !normalizedQuery ||
+        `${hotel.name} ${hotel.location} ${hotel.description} ${hotel.amenities.join(' ')}`
+          .toLowerCase()
+          .includes(normalizedQuery);
+
+      return matchesFilter && matchesQuery;
+    });
+  }, [hotels, searchQuery, selectedFilter]);
 
   return (
     <View style={styles.container}>
-      {/* Search & Filters */}
       <View style={styles.searchSection}>
         <View style={styles.searchInputContainer}>
           <MaterialCommunityIcons name="magnify" size={20} color="#6B7280" />
@@ -72,107 +139,69 @@ export function ExploreHotelsTab({ onNavigate }: ExploreHotelsTabProps) {
         </ScrollView>
       </View>
 
-      {/* Hotels List */}
       <ScrollView
         style={styles.hotelsList}
         contentContainerStyle={styles.hotelsContent}
         showsVerticalScrollIndicator={false}
       >
-        {filteredHotels.length > 0 ? (
+        {loading ? (
+          <View style={styles.noResultsContainer}>
+            <ActivityIndicator size="small" color="#1B73E8" />
+            <Text style={styles.noResultsText}>Loading hotels...</Text>
+          </View>
+        ) : filteredHotels.length > 0 ? (
           filteredHotels.map((hotel) => (
-            <View key={hotel.id} style={styles.hotelCard}>
-              {/* Image Section */}
-              <View style={styles.imageContainer}>
-                <Image
-                  source={{ uri: hotel.image }}
-                  style={styles.hotelImage}
-                  resizeMode="cover"
-                />
-                {hotel.verified && (
-                  <View style={styles.verifiedBadge}>
-                    <MaterialCommunityIcons name="check-circle" size={14} color="#fff" />
-                    <Text style={styles.verifiedText}>Verified</Text>
-                  </View>
-                )}
-              </View>
-
-              {/* Info Section */}
+            <TouchableOpacity
+              key={hotel.id}
+              style={styles.hotelCard}
+              activeOpacity={0.9}
+              onPress={() => onNavigate('hotel-details', hotel)}
+            >
+              <Image source={{ uri: hotel.image }} style={styles.hotelImage} />
               <View style={styles.hotelInfo}>
-                {/* Header */}
                 <View style={styles.hotelHeader}>
                   <View style={styles.hotelTitleContainer}>
-                    <Text style={styles.hotelName} numberOfLines={1}>
-                      {hotel.name}
-                    </Text>
+                    <Text style={styles.hotelName}>{hotel.name}</Text>
                     <View style={styles.locationRow}>
-                      <MaterialCommunityIcons name="map-marker" size={16} color="#6B7280" />
-                      <Text style={styles.locationText} numberOfLines={1}>
-                        {hotel.location}
-                      </Text>
+                      <MaterialCommunityIcons name="map-marker-outline" size={14} color="#6B7280" />
+                      <Text style={styles.locationText}>{hotel.location}</Text>
                     </View>
                   </View>
                   <View style={styles.ratingContainer}>
-                    <MaterialCommunityIcons name="star" size={16} color="#FFC107" />
-                    <Text style={styles.ratingText}>{hotel.rating}</Text>
+                    <MaterialCommunityIcons name="star" size={14} color="#F59E0B" />
+                    <Text style={styles.ratingText}>{hotel.rating.toFixed(1)}</Text>
                   </View>
                 </View>
 
-                {/* Description */}
-                {hotel.description && (
-                  <Text style={styles.description} numberOfLines={2}>
-                    {hotel.description}
-                  </Text>
-                )}
+                <Text style={styles.description} numberOfLines={2}>
+                  {hotel.description}
+                </Text>
 
-                {/* Amenities */}
                 <View style={styles.amenitiesContainer}>
-                  {hotel.amenities.slice(0, 4).map((amenity, index) => (
-                    <View key={index} style={styles.amenityBadge}>
-                      {amenity === 'Free WiFi' && (
-                        <MaterialCommunityIcons name="wifi" size={12} color="#6B7280" />
-                      )}
+                  {hotel.amenities.slice(0, 3).map((amenity) => (
+                    <View key={amenity} style={styles.amenityBadge}>
                       <Text style={styles.amenityText}>{amenity}</Text>
                     </View>
                   ))}
-                  {hotel.amenities.length > 4 && (
-                    <View style={styles.amenityBadge}>
-                      <Text style={styles.amenityText}>
-                        +{hotel.amenities.length - 4} more
-                      </Text>
-                    </View>
-                  )}
                 </View>
 
-                {/* Room Types */}
-                {hotel.roomTypes && hotel.roomTypes.length > 0 && (
-                  <Text style={styles.roomTypesText}>
-                    <Text style={styles.roomTypesCount}>{hotel.roomTypes.length}</Text> room types available
-                  </Text>
-                )}
-
-                {/* Price and Action */}
                 <View style={styles.footer}>
                   <View style={styles.priceContainer}>
-                    <View style={styles.priceRow}>
-                      <MaterialCommunityIcons name="cash" size={20} color="#1B73E8" />
-                      <Text style={styles.priceValue}>{hotel.pricePerNight}</Text>
-                    </View>
-                    <Text style={styles.priceLabel}>per night</Text>
+                    <Text style={styles.priceValue}>{hotel.pricePerNight}</Text>
                   </View>
-                  <TouchableOpacity
-                    style={styles.detailsButton}
-                    onPress={() => onNavigate('hotel-details', hotel)}
-                  >
+                  <View style={styles.detailsButton}>
                     <Text style={styles.detailsButtonText}>View Details</Text>
-                  </TouchableOpacity>
+                  </View>
                 </View>
               </View>
-            </View>
+            </TouchableOpacity>
           ))
         ) : (
           <View style={styles.noResultsContainer}>
             <MaterialCommunityIcons name="office-building" size={64} color="#D1D5DB" />
-            <Text style={styles.noResultsText}>No hotels found. Try adjusting your filters.</Text>
+            <Text style={styles.noResultsText}>
+              {errorText || 'No hotels matched your current search.'}
+            </Text>
           </View>
         )}
       </ScrollView>
@@ -246,6 +275,7 @@ const styles = StyleSheet.create({
   hotelCard: {
     backgroundColor: '#fff',
     borderRadius: 16,
+    marginBottom: 16,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -253,29 +283,9 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
-  imageContainer: {
-    position: 'relative',
-  },
   hotelImage: {
     width: '100%',
     height: 192,
-  },
-  verifiedBadge: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#2BC7B2',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    gap: 4,
-  },
-  verifiedText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
   },
   hotelInfo: {
     padding: 16,
@@ -313,8 +323,8 @@ const styles = StyleSheet.create({
   },
   ratingText: {
     fontSize: 14,
-    fontWeight: '600',
     color: '#1F2937',
+    fontWeight: '600',
   },
   description: {
     fontSize: 14,
@@ -329,26 +339,14 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   amenityBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: '#F3F4F6',
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 8,
-    gap: 4,
+    borderRadius: 12,
   },
   amenityText: {
     fontSize: 12,
     color: '#6B7280',
-  },
-  roomTypesText: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 16,
-  },
-  roomTypesCount: {
-    fontWeight: '600',
-    color: '#1F2937',
   },
   footer: {
     flexDirection: 'row',
@@ -359,21 +357,13 @@ const styles = StyleSheet.create({
     borderTopColor: '#E5E7EB',
   },
   priceContainer: {
-    gap: 2,
-  },
-  priceRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
   },
   priceValue: {
-    fontSize: 20,
+    fontSize: 14,
     fontWeight: '700',
     color: '#1B73E8',
-  },
-  priceLabel: {
-    fontSize: 12,
-    color: '#6B7280',
   },
   detailsButton: {
     backgroundColor: '#1B73E8',

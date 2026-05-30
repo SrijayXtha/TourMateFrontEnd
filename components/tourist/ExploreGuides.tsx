@@ -1,7 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
-    Image,
     ScrollView,
     StyleSheet,
     Text,
@@ -9,7 +8,6 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import { mockGuides } from "../../data/mockData";
 import { TouristTopBar } from "../common/TouristTopBar";
 
 interface ExploreGuidesProps {
@@ -23,17 +21,7 @@ export function ExploreGuides({ onNavigate, onBack }: ExploreGuidesProps) {
 
   const filters = ["All Guides", "Mountain", "Cultural", "Adventure"];
 
-  const filteredGuides = mockGuides.filter((guide) => {
-    const matchesSearch = guide.name
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
-    const matchesFilter =
-      selectedFilter === "All Guides" ||
-      guide.specialties.some((s) =>
-        s.toLowerCase().includes(selectedFilter.toLowerCase())
-      );
-    return matchesSearch && matchesFilter;
-  });
+  const filteredGuides: any[] = [];
 
   return (
     <View style={styles.container}>
@@ -95,76 +83,7 @@ export function ExploreGuides({ onNavigate, onBack }: ExploreGuidesProps) {
         contentContainerStyle={styles.guidesContent}
         showsVerticalScrollIndicator={false}
       >
-        {filteredGuides.length > 0 ? (
-          filteredGuides.map((guide) => (
-            <View key={guide.id} style={styles.guideCard}>
-              <View style={styles.guideCardContent}>
-                <Image
-                  source={typeof guide.photo === 'string' ? { uri: guide.photo } : guide.photo}
-                  style={styles.guidePhoto}
-                  resizeMode="cover"
-                />
-                <View style={styles.guideInfo}>
-                  <View style={styles.guideHeader}>
-                    <View style={styles.guideTitleContainer}>
-                      <Text style={styles.guideName} numberOfLines={1}>
-                        {guide.name}
-                      </Text>
-                      {guide.verified && (
-                        <View style={styles.verifiedBadge}>
-                          <Ionicons
-                            name="checkmark-circle"
-                            size={14}
-                            color="#2BC7B2"
-                          />
-                          <Text style={styles.verifiedText}>Verified</Text>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-
-                  <View style={styles.guideStats}>
-                    <View style={styles.statItem}>
-                      <Ionicons name="star" size={14} color="#FBBF24" />
-                      <Text style={styles.statText}>{guide.rating}</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                      <Ionicons name="location" size={14} color="#6B7280" />
-                      <Text style={styles.statText}>{guide.experience}</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.specialtiesContainer}>
-                    {guide.specialties.slice(0, 2).map((specialty) => (
-                      <View key={specialty} style={styles.specialtyBadge}>
-                        <Text style={styles.specialtyText}>{specialty}</Text>
-                      </View>
-                    ))}
-                  </View>
-
-                  <View style={styles.guideFooter}>
-                    <View style={styles.priceContainer}>
-                      <MaterialCommunityIcons
-                        name="currency-usd"
-                        size={16}
-                        color="#1B73E8"
-                      />
-                      <Text style={styles.priceText}>
-                        {guide.pricePerDay}/day
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      onPress={() => onNavigate("guide-profile", guide)}
-                      style={styles.viewButton}
-                    >
-                      <Text style={styles.viewButtonText}>View Profile</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-            </View>
-          ))
-        ) : (
+        {filteredGuides.length > 0 ? null : (
           <View style={styles.noResults}>
             <MaterialCommunityIcons
               name="magnify"
@@ -172,8 +91,11 @@ export function ExploreGuides({ onNavigate, onBack }: ExploreGuidesProps) {
               color="#9CA3AF"
             />
             <Text style={styles.noResultsText}>
-              No guides found. Try adjusting your filters.
+              Live guide discovery is not connected to the backend yet.
             </Text>
+            <TouchableOpacity style={styles.viewButton} onPress={() => onNavigate("home")}>
+              <Text style={styles.viewButtonText}>Back To Home</Text>
+            </TouchableOpacity>
           </View>
         )}
       </ScrollView>

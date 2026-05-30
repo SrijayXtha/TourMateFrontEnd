@@ -37,6 +37,7 @@ interface Guide {
   minDurationDays?: number;
   minDurationLabel?: string;
   destinationName?: string;
+  destinations?: { destinationId?: number; name: string; location?: string }[];
 }
 
 interface GuideProfileProps {
@@ -284,6 +285,25 @@ export function GuideProfile({ guide, onBack, onBook, onMessage }: GuideProfileP
                 {guide.languages.map((lang, index) => (
                   <View key={index} style={styles.languageTag}>
                     <Text style={styles.languageTagText}>{lang}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {guide.destinations && guide.destinations.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.languagesHeader}>
+                <MaterialCommunityIcons name="map-marker-radius" size={18} color="#1B73E8" />
+                <Text style={styles.sectionTitle}>Destinations</Text>
+              </View>
+              <View style={styles.tagsContainer}>
+                {guide.destinations.map((destination, index) => (
+                  <View
+                    key={`${destination.name}-${index}`}
+                    style={styles.languageTag}
+                  >
+                    <Text style={styles.languageTagText}>{destination.name}</Text>
                   </View>
                 ))}
               </View>

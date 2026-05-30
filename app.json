@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/logo.png",
-    "scheme": "tourmate",
+    "scheme": "com.srijay.tourmate",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -13,6 +13,7 @@
       "bundleIdentifier": "com.srijay.tourmate"
     },
     "android": {
+      "package": "com.srijay.tourmate",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

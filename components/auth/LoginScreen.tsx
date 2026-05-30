@@ -1,7 +1,9 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { makeRedirectUri, ResponseType } from "expo-auth-session";
 import * as Google from "expo-auth-session/providers/google";
+import Constants from "expo-constants";
 import React, { useEffect, useRef, useState } from "react";
+import * as WebBrowser from "expo-web-browser";
 
 import {
     ActivityIndicator,
@@ -23,22 +25,26 @@ import {
     TouchableOpacity,
 
     View,
+    Platform,
 } from "react-native";
 
 import { authAPI } from "../../constants/api";
 
-import { GOOGLE_WEB_CLIENT_ID } from "../../constants/googleAuth";
+import {
+  GOOGLE_ANDROID_CLIENT_ID,
+  GOOGLE_AUTH_IS_CONFIGURED,
+  GOOGLE_IOS_CLIENT_ID,
+  GOOGLE_WEB_CLIENT_ID,
+} from "../../constants/googleAuth";
+
+WebBrowser.maybeCompleteAuthSession();
 
 
 
 const GOOGLE_REDIRECT_URI = makeRedirectUri({
-
-  scheme: "tourmate",
-
+  scheme: "com.srijay.tourmate",
+  native: "com.srijay.tourmate:/oauthredirect",
   path: "oauthredirect",
-
-  preferLocalhost: true,
-
 });
 
 
@@ -68,18 +74,24 @@ export function LoginScreen({
   const [showPassword, setShowPassword] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
+  const [showGoogleOnboarding, setShowGoogleOnboarding] = useState(false);
+  const [googleEmail, setGoogleEmail] = useState("");
+  const [onboardingFullName, setOnboardingFullName] = useState("");
+  const [onboardingUsername, setOnboardingUsername] = useState("");
+  const [onboardingPhone, setOnboardingPhone] = useState("");
+  const [onboardingPassword, setOnboardingPassword] = useState("");
+  const [onboardingConfirmPassword, setOnboardingConfirmPassword] = useState("");
+  const [onboardingEmergencyContact, setOnboardingEmergencyContact] = useState("");
+  const [onboardingPreferences, setOnboardingPreferences] = useState<string[]>([]);
 
   const processedGoogleTokenRef = useRef<string | null>(null);
-
-
+  const isExpoGo = Constants.executionEnvironment === "storeClient";
+  const touristPreferences = ["Adventure", "Cultural", "Nature", "Historical", "Beach", "Mountain"];
 
   const [request, response, promptAsync] = Google.useAuthRequest({
-
-    webClientId: GOOGLE_WEB_CLIENT_ID,
-
-    iosClientId: GOOGLE_WEB_CLIENT_ID,
-
-    androidClientId: GOOGLE_WEB_CLIENT_ID,
+    webClientId: GOOGLE_WEB_CLIENT_ID || undefined,
+    iosClientId: GOOGLE_IOS_CLIENT_ID || undefined,
+    androidClientId: GOOGLE_ANDROID_CLIENT_ID || undefined,
 
     redirectUri: GOOGLE_REDIRECT_URI,
 
@@ -145,7 +157,22 @@ export function LoginScreen({
 
       }
 
-      onLogin(apiResponse.user.role);
+      const authenticatedUser = apiResponse?.data?.user || apiResponse?.user;
+      if (!authenticatedUser?.role) {
+        throw new Error("Google login succeeded but no user role was returned by the backend.");
+      }
+
+      if (authenticatedUser.role === "tourist" && apiResponse?.needsOnboarding) {
+        setGoogleEmail(String(authenticatedUser.email || ""));
+        setOnboardingFullName(String(authenticatedUser.full_name || authenticatedUser.fullName || ""));
+        setOnboardingUsername(String(authenticatedUser.username || ""));
+        setOnboardingPhone(String(authenticatedUser.phone || ""));
+        setOnboardingEmergencyContact(String(authenticatedUser.phone || ""));
+        setShowGoogleOnboarding(true);
+        return;
+      }
+
+      onLogin(authenticatedUser.role);
 
     } catch (error: any) {
 
@@ -278,7 +305,8 @@ export function LoginScreen({
     };
 
     processGoogleLogin();
-
+    // `completeGoogleLogin` intentionally stays out of deps to avoid reprocessing the same token.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onLogin, response]);
 
 
@@ -295,100 +323,27 @@ export function LoginScreen({
 
 
 
-    setIsLoading(true);
-
-    
-
-    // Simulate a delay for loading state
-
-    setTimeout(() => {
-
-      setIsLoading(false);
-
-      
-
-      // Mock authentication - determine role based on username
-
-      let role = "tourist"; // Default role
-
-      
-
-      if (username.toLowerCase().includes("guide")) {
-
-        role = "guide";
-
-      } else if (username.toLowerCase().includes("hotel")) {
-
-        role = "hotel";
-
-      } else if (username.toLowerCase().includes("admin")) {
-
-        role = "admin";
-
+    try {
+      const response = await authAPI.login({
+        email: username.trim(),
+        password,
+      });
+      Alert.alert("Success", response.message || "Login successful!");
+      const authenticatedUser = response?.data?.user || response?.user;
+      if (!authenticatedUser?.role) {
+        throw new Error("Login succeeded but no user role was returned by the backend.");
       }
 
-      
-
-      Alert.alert("Success", `Login successful as ${role}!`);
-
-      onLogin(role);
-
-    }, 1000);
-
-
-
-    // TODO: Enable this when backend is ready
-
-    /*
-
-    try {
-
-      // Call the backend API
-
-      const response = await authAPI.login({
-
-        email: username, // Using username as email
-
-        password: password,
-
-      });
-
-
-
-      // Success - show message and navigate
-
-      Alert.alert("Success", response.message || "Login successful!");
-
-      console.log("Login response:", response);
-
-      
-
-      // Navigate based on the role returned from backend
-
-      onLogin(response.user.role);
-
+      onLogin(authenticatedUser.role);
     } catch (error: any) {
-
-      // Handle errors from backend
-
       Alert.alert(
-
         "Login Failed",
-
         error.message || "Unable to login. Please try again."
-
       );
-
       console.error("Login error:", error);
-
     } finally {
-
       setIsLoading(false);
-
     }
-
-    */
-
   };
 
 
@@ -405,9 +360,80 @@ export function LoginScreen({
 
   };
 
+  const toggleOnboardingPreference = (preference: string) => {
+    setOnboardingPreferences((current) =>
+      current.includes(preference)
+        ? current.filter((item) => item !== preference)
+        : [...current, preference]
+    );
+  };
+
+  const handleGoogleOnboardingSubmit = async () => {
+    if (
+      !onboardingFullName.trim() ||
+      !onboardingUsername.trim() ||
+      !onboardingPhone.trim() ||
+      !onboardingEmergencyContact.trim() ||
+      !onboardingPassword
+    ) {
+      Alert.alert("Missing Details", "Please complete all required tourist account details.");
+      return;
+    }
+
+    if (onboardingPassword.length < 6) {
+      Alert.alert("Weak Password", "Password must be at least 6 characters long.");
+      return;
+    }
+
+    if (onboardingPassword !== onboardingConfirmPassword) {
+      Alert.alert("Password Mismatch", "Password and confirm password do not match.");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await authAPI.completeGoogleOnboarding({
+        fullName: onboardingFullName.trim(),
+        username: onboardingUsername.trim(),
+        phone: onboardingPhone.trim(),
+        password: onboardingPassword,
+        emergencyContact: onboardingEmergencyContact.trim(),
+        preferences: onboardingPreferences,
+      });
+
+      setShowGoogleOnboarding(false);
+      Alert.alert("Success", response.message || "Tourist account setup complete.");
+      onLogin("tourist");
+    } catch (error: any) {
+      Alert.alert(
+        "Setup Failed",
+        error?.message || "Unable to finish your Google tourist account setup."
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
 
 
   const handleGoogleLogin = async () => {
+    if (isExpoGo) {
+      Alert.alert(
+        "Google Sign-In Needs A Dev Build",
+        "Google OAuth cannot be tested inside Expo Go. Use a development build or a simulator build so the app can redirect back with the native scheme com.srijay.tourmate:/oauthredirect."
+      );
+      return;
+    }
+
+    if (!GOOGLE_AUTH_IS_CONFIGURED) {
+      Alert.alert(
+        "Google Sign-In Not Configured",
+        `Set EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID, EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID, and EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID before using Google sign-in.\n\nCurrent platform: ${Platform.OS}\nRedirect URI: ${GOOGLE_REDIRECT_URI}`
+      );
+      return;
+    }
+
     if (isLoading || !request) {
       return;
     }
@@ -503,17 +529,157 @@ export function LoginScreen({
 
           <Text style={styles.subtitle}>
 
-            Enter your credentials to continue
+            {showGoogleOnboarding
+              ? "Complete your tourist account before entering TourMate"
+              : "Enter your credentials to continue"}
 
           </Text>
 
+          {showGoogleOnboarding ? (
+            <>
+              <View style={styles.googleInfoBox}>
+                <Text style={styles.googleInfoTitle}>Google sign-in is for tourists only</Text>
+                <Text style={styles.googleInfoText}>
+                  We&apos;ve created your tourist account. Finish the details below so your profile,
+                  safety contacts, and future settings match your registration info.
+                </Text>
+              </View>
 
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Email</Text>
+                <View style={styles.readonlyInputWrapper}>
+                  <Text style={styles.readonlyInputText}>{googleEmail}</Text>
+                </View>
+              </View>
 
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Full Name</Text>
+                <View style={styles.inputWrapper}>
+                  <MaterialCommunityIcons name="account" size={20} color="#9CA3AF" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter your full name"
+                    placeholderTextColor="#9CA3AF"
+                    value={onboardingFullName}
+                    onChangeText={setOnboardingFullName}
+                  />
+                </View>
+              </View>
 
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Username</Text>
+                <View style={styles.inputWrapper}>
+                  <MaterialCommunityIcons name="at" size={20} color="#9CA3AF" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Choose a username"
+                    placeholderTextColor="#9CA3AF"
+                    value={onboardingUsername}
+                    onChangeText={setOnboardingUsername}
+                    autoCapitalize="none"
+                  />
+                </View>
+              </View>
 
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Phone Number</Text>
+                <View style={styles.inputWrapper}>
+                  <MaterialCommunityIcons name="phone" size={20} color="#9CA3AF" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter your phone number"
+                    placeholderTextColor="#9CA3AF"
+                    value={onboardingPhone}
+                    onChangeText={setOnboardingPhone}
+                    keyboardType="phone-pad"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Emergency Contact Number</Text>
+                <View style={styles.inputWrapper}>
+                  <MaterialCommunityIcons name="phone-alert" size={20} color="#9CA3AF" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter your emergency contact"
+                    placeholderTextColor="#9CA3AF"
+                    value={onboardingEmergencyContact}
+                    onChangeText={setOnboardingEmergencyContact}
+                    keyboardType="phone-pad"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Set Password</Text>
+                <View style={styles.inputWrapper}>
+                  <MaterialCommunityIcons name="lock" size={20} color="#9CA3AF" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Create a password"
+                    placeholderTextColor="#9CA3AF"
+                    value={onboardingPassword}
+                    onChangeText={setOnboardingPassword}
+                    secureTextEntry
+                  />
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Confirm Password</Text>
+                <View style={styles.inputWrapper}>
+                  <MaterialCommunityIcons name="lock-check" size={20} color="#9CA3AF" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Confirm your password"
+                    placeholderTextColor="#9CA3AF"
+                    value={onboardingConfirmPassword}
+                    onChangeText={setOnboardingConfirmPassword}
+                    secureTextEntry
+                  />
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Travel Preferences</Text>
+                <View style={styles.preferencePills}>
+                  {touristPreferences.map((preference) => {
+                    const selected = onboardingPreferences.includes(preference);
+                    return (
+                      <TouchableOpacity
+                        key={preference}
+                        style={[styles.preferencePill, selected && styles.preferencePillSelected]}
+                        onPress={() => toggleOnboardingPreference(preference)}
+                      >
+                        <Text
+                          style={[
+                            styles.preferencePillText,
+                            selected && styles.preferencePillTextSelected,
+                          ]}
+                        >
+                          {preference}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
+                onPress={handleGoogleOnboardingSubmit}
+                activeOpacity={0.8}
+                disabled={isLoading}
+              >
+                {isLoading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.loginButtonText}>Complete Tourist Setup</Text>}
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
           <View style={styles.inputGroup}>
 
-            <Text style={styles.label}>Username</Text>
+            <Text style={styles.label}>Email</Text>
 
             <View style={styles.inputWrapper}>
 
@@ -533,7 +699,7 @@ export function LoginScreen({
 
                 style={styles.input}
 
-                placeholder="Enter your username"
+                placeholder="Enter your email"
 
                 placeholderTextColor="#9CA3AF"
 
@@ -679,6 +845,10 @@ export function LoginScreen({
 
           </TouchableOpacity>
 
+          <Text style={styles.googleHelperText}>
+            Google sign-in is available for tourist accounts only.
+          </Text>
+
 
 
           <View style={styles.registerContainer}>
@@ -692,6 +862,8 @@ export function LoginScreen({
             </TouchableOpacity>
 
           </View>
+            </>
+          )}
 
         </View>
 
@@ -1009,6 +1181,80 @@ const styles = StyleSheet.create({
 
     fontWeight: "600",
 
+  },
+
+  googleHelperText: {
+    marginTop: -12,
+    marginBottom: 24,
+    fontSize: 12,
+    color: "#6B7280",
+    textAlign: "center",
+  },
+
+  googleInfoBox: {
+    backgroundColor: "#EFF6FF",
+    borderColor: "#BFDBFE",
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 20,
+  },
+
+  googleInfoTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#1D4ED8",
+    marginBottom: 6,
+  },
+
+  googleInfoText: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: "#1F2937",
+  },
+
+  readonlyInputWrapper: {
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    backgroundColor: "#F8FAFC",
+  },
+
+  readonlyInputText: {
+    fontSize: 16,
+    color: "#475569",
+  },
+
+  preferencePills: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+
+  preferencePill: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    backgroundColor: "#FFFFFF",
+  },
+
+  preferencePillSelected: {
+    borderColor: "#1B73E8",
+    backgroundColor: "#DBEAFE",
+  },
+
+  preferencePillText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#4B5563",
+  },
+
+  preferencePillTextSelected: {
+    color: "#1D4ED8",
   },
 
   registerContainer: {

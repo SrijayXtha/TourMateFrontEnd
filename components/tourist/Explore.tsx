@@ -14,10 +14,15 @@ import { ExploreHotelsTab } from './ExploreHotelsTab';
 interface ExploreProps {
   onNavigate: (screen: string, data?: any) => void;
   onBack: () => void;
+  initialTab?: 'destinations' | 'guides' | 'hotels';
 }
 
-export function Explore({ onNavigate, onBack }: ExploreProps) {
-  const [activeTab, setActiveTab] = useState<'destinations' | 'guides' | 'hotels'>('destinations');
+export function Explore({ onNavigate, onBack, initialTab = 'destinations' }: ExploreProps) {
+  const [activeTab, setActiveTab] = useState<'destinations' | 'guides' | 'hotels'>(initialTab);
+
+  React.useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   return (
     <View style={styles.container}>

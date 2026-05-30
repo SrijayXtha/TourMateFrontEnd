@@ -1,2 +1,12 @@
 export const GOOGLE_WEB_CLIENT_ID =
-  "718421238123-9lo3r2sm0pe44g2ffj6lkoumtu82mn6h.apps.googleusercontent.com";
+  process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? "";
+
+export const GOOGLE_IOS_CLIENT_ID =
+  process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? "";
+
+export const GOOGLE_ANDROID_CLIENT_ID =
+  process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ?? "";
+
+export const GOOGLE_AUTH_IS_CONFIGURED = Boolean(
+  GOOGLE_WEB_CLIENT_ID && GOOGLE_IOS_CLIENT_ID && GOOGLE_ANDROID_CLIENT_ID
+);

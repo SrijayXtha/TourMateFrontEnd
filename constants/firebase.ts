@@ -133,7 +133,14 @@ export const syncFirebaseAuthWithCredentials = async (params: {
     }
     return credential.user;
   } catch (error: any) {
-    if (error?.code === 'auth/user-not-found') {
+    const errorCode = String(error?.code || '').trim();
+    const errorMessage = String(error?.message || '').trim();
+    const shouldCreateCredentialUser =
+      errorCode === 'auth/user-not-found' ||
+      errorCode === 'auth/invalid-credential' ||
+      errorMessage.includes('INVALID_LOGIN_CREDENTIALS');
+
+    if (shouldCreateCredentialUser) {
       try {
         const credential = await createUserWithEmailAndPassword(firebaseAuth, email, password);
         if (params.fullName) {
@@ -144,7 +151,7 @@ export const syncFirebaseAuthWithCredentials = async (params: {
         console.warn('Failed to create Firebase credential user:', createError);
       }
     } else {
-      console.warn('Firebase credential sign-in failed, falling back to anonymous:', error?.code || error);
+      console.warn('Firebase credential sign-in failed, falling back to anonymous:', errorCode || error);
     }
 
     return ensureFirebaseSession();

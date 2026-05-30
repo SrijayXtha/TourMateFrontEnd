@@ -22,7 +22,6 @@ import MapView, {
     UrlTile
 } from "react-native-maps";
 import { api } from "../../constants/api";
-import { mockGuides, mockHotels } from "../../data/mockData";
 import { openAppMenu } from "../common/menu";
 import CustomMarker from "./CustomMarker";
 import GuideMarker from "./GuideMarker";
@@ -94,13 +93,6 @@ interface NearbyMarkerOptions {
   maxVisible?: number;
 }
 
-interface HotelCluster {
-  id: string;
-  latitude: number;
-  longitude: number;
-  count: number;
-}
-
 const DEFAULT_CENTER: Coordinate = { latitude: 28.416, longitude: 82.211 };
 // Use no-label/no-POI tiles so built-in point symbols from the basemap do not render.
 const CARTO_LIGHT_TILE_TEMPLATE = "https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png";
@@ -117,10 +109,9 @@ const MAX_VISIBLE_MARKERS = 18;
 const GUIDE_RADIUS_METERS = 5000;
 const HOTEL_RADIUS_METERS = 5000;
 const LANDMARK_COLOR = "#6B5B2E";
-const LANDMARK_MEDICAL_COLOR = "#8B3F63";
 const LANDMARK_LABEL_FONT_SIZE = 11;
 
-const LOCATION_COORDINATES: Array<Coordinate & { key: string; label: string }> = [
+const LOCATION_COORDINATES: (Coordinate & { key: string; label: string })[] = [
   { key: "lalitpur", label: "Lalitpur", latitude: 27.6644, longitude: 85.3188 },
   { key: "kathmandu", label: "Kathmandu", latitude: 27.7172, longitude: 85.324 },
   { key: "boudha", label: "Boudha", latitude: 27.7215, longitude: 85.362 },
@@ -410,39 +401,6 @@ const normalize = (value: string): string =>
     .trim()
     .toLowerCase();
 
-const toSeed = (value: string): number => {
-  const parsed = Number.parseInt(value, 10);
-  if (Number.isFinite(parsed)) {
-    return parsed;
-  }
-
-  return value
-    .split("")
-    .reduce((sum, char) => sum + char.charCodeAt(0), 0);
-};
-
-const jitterCoordinate = (coordinate: Coordinate, seed: number): Coordinate => {
-  const latOffset = ((seed % 5) - 2) * 0.012;
-  const lonOffset = (((seed * 7) % 5) - 2) * 0.012;
-
-  return {
-    latitude: coordinate.latitude + latOffset,
-    longitude: coordinate.longitude + lonOffset,
-  };
-};
-
-const resolveCoordinates = (location: string): Coordinate | null => {
-  const normalizedLocation = normalize(location);
-
-  for (const entry of LOCATION_COORDINATES) {
-    if (normalizedLocation.includes(entry.key)) {
-      return { latitude: entry.latitude, longitude: entry.longitude };
-    }
-  }
-
-  return null;
-};
-
 const toRadians = (value: number) => (value * Math.PI) / 180;
 
 const haversineDistanceKm = (from: Coordinate, to: Coordinate): number => {
@@ -529,47 +487,12 @@ const markerDescription = (marker: MapMarker): string => {
   return parts.length ? parts.join(" • ") : marker.location;
 };
 
-const clusterHotelMarkers = (markers: MapMarker[], latitudeDelta: number): HotelCluster[] => {
-  const cellSize = Math.max(0.015, Math.min(0.08, latitudeDelta / 4));
-  const bucket = new Map<string, MapMarker[]>();
-
-  markers.forEach((marker) => {
-    const latKey = Math.round(marker.latitude / cellSize);
-    const lonKey = Math.round(marker.longitude / cellSize);
-    const key = `${latKey}:${lonKey}`;
-    const group = bucket.get(key) ?? [];
-    group.push(marker);
-    bucket.set(key, group);
-  });
-
-  const result: HotelCluster[] = [];
-
-  bucket.forEach((group, key) => {
-    if (group.length < 2) {
-      return;
-    }
-
-    const latitude = group.reduce((sum, marker) => sum + marker.latitude, 0) / group.length;
-    const longitude = group.reduce((sum, marker) => sum + marker.longitude, 0) / group.length;
-
-    result.push({
-      id: `cluster-${key}`,
-      latitude,
-      longitude,
-      count: group.length,
-    });
-  });
-
-  return result;
-};
-
 export function TouristMap({ onBack, onNavigate }: TouristMapProps) {
   const mapRef = useRef<MapView>(null);
   const hasInitialZoomRef = useRef(false);
 
   const [mapReady, setMapReady] = useState(false);
   const [userLocation, setUserLocation] = useState<Coordinate | null>(null);
-  const [currentRegion, setCurrentRegion] = useState<Region>(INITIAL_REGION);
   const [dynamicHotels, setDynamicHotels] = useState<MapMarker[]>([]);
   const [backendGuides, setBackendGuides] = useState<MapMarker[]>([]);
   const [routeCoordinates, setRouteCoordinates] = useState<Coordinate[]>([]);
@@ -588,66 +511,6 @@ export function TouristMap({ onBack, onNavigate }: TouristMapProps) {
   const [activeDestinationName, setActiveDestinationName] = useState("");
   const navTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const ignoreNextMapPressRef = useRef(false);
-
-  const fallbackGuideMarkers = useMemo<MapMarker[]>(() => {
-    return mockGuides.reduce<MapMarker[]>((markers, guide, index) => {
-      const baseCoordinate = resolveCoordinates(guide.location || "");
-      if (!baseCoordinate) {
-        return markers;
-      }
-
-      const coordinate = jitterCoordinate(baseCoordinate, toSeed(String(guide.id)) + index);
-      markers.push({
-        id: `guide-${guide.id}`,
-        sourceId: String(guide.id),
-        name: guide.name,
-        kind: "guide",
-        group: "guide",
-        location: guide.location || "Unknown",
-        rating: guide.rating,
-        specialty: Array.isArray((guide as any).specialties)
-          ? String((guide as any).specialties[0] || "City Tour")
-          : "City Tour",
-        profileImage:
-          typeof (guide as any).photo === "string" ? (guide as any).photo : undefined,
-        available: true,
-        description: "Registered guide",
-        latitude: coordinate.latitude,
-        longitude: coordinate.longitude,
-      });
-
-      return markers;
-    }, []);
-  }, []);
-
-  const fallbackHotelMarkers = useMemo<MapMarker[]>(() => {
-    return mockHotels.reduce<MapMarker[]>((markers, hotel, index) => {
-      const baseCoordinate = resolveCoordinates(hotel.location || "");
-      if (!baseCoordinate) {
-        return markers;
-      }
-
-      const coordinate = jitterCoordinate(baseCoordinate, toSeed(String(hotel.id)) + index + 21);
-      markers.push({
-        id: `hotel-${hotel.id}`,
-        sourceId: String(hotel.id),
-        name: hotel.name,
-        kind: "hotel",
-        group: "place",
-        location: hotel.location || "Unknown",
-        rating: hotel.rating,
-        stars:
-          Number.isFinite(Number(hotel.rating)) && Number(hotel.rating) > 0
-            ? Number(hotel.rating)
-            : undefined,
-        description: "Hotel",
-        latitude: coordinate.latitude,
-        longitude: coordinate.longitude,
-      });
-
-      return markers;
-    }, []);
-  }, []);
 
   const infrastructureMarkers = useMemo<MapMarker[]>(() => {
     return KNOWN_INFRASTRUCTURES.map((entry) => ({
@@ -677,8 +540,8 @@ export function TouristMap({ onBack, onNavigate }: TouristMapProps) {
 
   const origin = userLocation || DEFAULT_CENTER;
 
-  const guidePool = backendGuides.length ? backendGuides : fallbackGuideMarkers;
-  const hotelPool = dynamicHotels.length ? dynamicHotels : fallbackHotelMarkers;
+  const guidePool = backendGuides;
+  const hotelPool = dynamicHotels;
 
   const visibleGuides = useMemo(() => {
     return selectNearbyMarkers(guidePool, origin, {
@@ -712,10 +575,6 @@ export function TouristMap({ onBack, onNavigate }: TouristMapProps) {
     });
   }, [incidentMarkers, origin]);
 
-  const visiblePlaces = useMemo(() => {
-    return [...visibleHotels, ...visibleInfrastructures];
-  }, [visibleHotels, visibleInfrastructures]);
-
   const searchableMarkers = useMemo(() => {
     return [...visibleHotels, ...visibleGuides, ...visibleInfrastructures];
   }, [visibleHotels, visibleGuides, visibleInfrastructures]);
@@ -730,16 +589,6 @@ export function TouristMap({ onBack, onNavigate }: TouristMapProps) {
       .filter((marker) => normalize(`${marker.name} ${marker.location}`).includes(query))
       .slice(0, 6);
   }, [searchQuery, searchableMarkers]);
-
-  const showHotelClusters = currentRegion.latitudeDelta > 0.18;
-
-  const hotelClusters = useMemo(() => {
-    if (!showHotelClusters) {
-      return [];
-    }
-
-    return clusterHotelMarkers(visibleHotels, currentRegion.latitudeDelta);
-  }, [showHotelClusters, visibleHotels, currentRegion.latitudeDelta]);
 
   // Start live GPS and keep updating position.
   useEffect(() => {
@@ -862,7 +711,7 @@ export function TouristMap({ onBack, onNavigate }: TouristMapProps) {
     };
   }, [userLocation]);
 
-  // Fetch nearby guides from backend API with fallback to mock guides.
+  // Fetch nearby guides from backend API only.
   useEffect(() => {
     let canceled = false;
 
@@ -1103,23 +952,7 @@ export function TouristMap({ onBack, onNavigate }: TouristMapProps) {
   };
 
   const handleViewDetails = (marker: MapMarker) => {
-    if (marker.kind === "hotel" && marker.sourceId) {
-      const selectedHotel = mockHotels.find((item) => String(item.id) === marker.sourceId);
-      if (selectedHotel) {
-        onNavigate("hotel-details", selectedHotel);
-        return;
-      }
-    }
-
-    if (marker.kind === "guide" && marker.sourceId) {
-      const selectedGuide = mockGuides.find((item) => String(item.id) === marker.sourceId);
-      if (selectedGuide) {
-        onNavigate("guide-profile", selectedGuide);
-        return;
-      }
-    }
-
-    Alert.alert(marker.name, markerDescription(marker));
+    Alert.alert(marker.name, "Live detail pages for map markers are not connected yet.");
   };
 
   const handleDirectionsPress = async (marker: MapMarker) => {
@@ -1142,20 +975,6 @@ export function TouristMap({ onBack, onNavigate }: TouristMapProps) {
   };
 
   const getMarkerImage = (marker: MapMarker): string => {
-    if (marker.kind === "hotel" && marker.sourceId) {
-      const selectedHotel = mockHotels.find((item) => String(item.id) === marker.sourceId);
-      if (selectedHotel?.image) {
-        return selectedHotel.image;
-      }
-    }
-
-    if (marker.kind === "guide" && marker.sourceId) {
-      const selectedGuide = mockGuides.find((item) => String(item.id) === marker.sourceId);
-      if (typeof selectedGuide?.photo === "string") {
-        return selectedGuide.photo;
-      }
-    }
-
     return "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=500&q=80";
   };
 
@@ -1265,7 +1084,6 @@ export function TouristMap({ onBack, onNavigate }: TouristMapProps) {
         showsCompass
         showsUserLocation={false}
         onMapReady={() => setMapReady(true)}
-        onRegionChangeComplete={(region) => setCurrentRegion(region)}
         onPress={handleMapPress}
       >
         <UrlTile urlTemplate={CARTO_LIGHT_TILE_TEMPLATE} maximumZ={20} flipY={false} zIndex={0} />

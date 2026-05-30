@@ -5,6 +5,7 @@ import {
     ActivityIndicator,
     Alert,
     Image,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -16,9 +17,10 @@ import { hotelAPI } from "../../constants/api";
 
 interface HotelManageProps {
   onBack: () => void;
+  onLogout: () => void;
 }
 
-export function HotelManage({ onBack }: HotelManageProps) {
+export function HotelManage({ onBack, onLogout }: HotelManageProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -112,12 +114,27 @@ export function HotelManage({ onBack }: HotelManageProps) {
         },
       });
 
-      Alert.alert("Success", "Hotel profile updated");
+      await loadProfile();
+      Alert.alert("Changes Saved", "Your hotel changes have been saved.");
     } catch (error: any) {
       Alert.alert("Update Failed", error?.message || "Unable to update hotel profile");
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleLogout = () => {
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      if (window.confirm("Are you sure you want to logout?")) {
+        onLogout();
+      }
+      return;
+    }
+
+    Alert.alert("Logout", "Are you sure you want to logout?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Logout", onPress: onLogout, style: "destructive" },
+    ]);
   };
 
   if (loading) {
@@ -223,6 +240,14 @@ export function HotelManage({ onBack }: HotelManageProps) {
         >
           <Text style={styles.primaryButtonText}>{saving ? "Saving..." : "Save Hotel Profile"}</Text>
         </TouchableOpacity>
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Session</Text>
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+            <MaterialCommunityIcons name="logout" size={16} color="#DC2626" />
+            <Text style={styles.logoutText}>Logout</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </View>
   );
@@ -261,6 +286,22 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     backgroundColor: "#EFF6FF",
     marginBottom: 8,
+  },
+  logoutButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    backgroundColor: "#FEF2F2",
+    borderRadius: 10,
+    paddingVertical: 12,
+  },
+  logoutText: {
+    color: "#DC2626",
+    fontSize: 14,
+    fontWeight: "700",
   },
   photoButtonText: { color: "#1D4ED8", fontSize: 13, fontWeight: "600" },
   inputLabel: { fontSize: 13, color: "#374151", fontWeight: "600", marginBottom: 6 },

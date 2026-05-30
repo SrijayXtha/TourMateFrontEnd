@@ -1,7 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
-    Image,
     ScrollView,
     StyleSheet,
     Text,
@@ -9,7 +8,6 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import { mockHotels } from "../../data/mockData";
 import { TouristTopBar } from "../common/TouristTopBar";
 
 interface ExploreHotelsProps {
@@ -23,15 +21,7 @@ export function ExploreHotels({ onNavigate, onBack }: ExploreHotelsProps) {
 
   const filters = ["All Hotels", "Resort", "Boutique", "Budget"];
 
-  const filteredHotels = mockHotels.filter((hotel) => {
-    const matchesSearch = hotel.name
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
-    const matchesFilter =
-      selectedFilter === "All Hotels" ||
-      hotel.name.toLowerCase().includes(selectedFilter.toLowerCase());
-    return matchesSearch && matchesFilter;
-  });
+  const filteredHotels: any[] = [];
 
   return (
     <View style={styles.container}>
@@ -94,79 +84,6 @@ export function ExploreHotels({ onNavigate, onBack }: ExploreHotelsProps) {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.contentContainer}
       >
-        {filteredHotels.map((hotel) => (
-          <View key={hotel.id} style={styles.hotelCard}>
-            <Image source={{ uri: hotel.image }} style={styles.hotelImage} />
-            <View style={styles.hotelContent}>
-              <View style={styles.hotelHeader}>
-                <View style={styles.hotelInfo}>
-                  <View style={styles.hotelNameContainer}>
-                    <Text style={styles.hotelName}>{hotel.name}</Text>
-                    {hotel.verified && (
-                      <View style={styles.verifiedBadge}>
-                        <MaterialCommunityIcons
-                          name="check-decagram"
-                          size={16}
-                          color="#2BC7B2"
-                        />
-                        <Text style={styles.verifiedText}>Verified</Text>
-                      </View>
-                    )}
-                  </View>
-                  <View style={styles.locationContainer}>
-                    <MaterialCommunityIcons
-                      name="map-marker"
-                      size={16}
-                      color="#6B7280"
-                    />
-                    <Text style={styles.locationText}>{hotel.location}</Text>
-                  </View>
-                </View>
-                <View style={styles.ratingContainer}>
-                  <MaterialCommunityIcons
-                    name="star"
-                    size={16}
-                    color="#FACC15"
-                  />
-                  <Text style={styles.ratingText}>{hotel.rating}</Text>
-                </View>
-              </View>
-
-              <View style={styles.amenitiesContainer}>
-                {hotel.amenities.slice(0, 3).map((amenity) => (
-                  <View key={amenity} style={styles.amenityBadge}>
-                    <Text style={styles.amenityText}>{amenity}</Text>
-                  </View>
-                ))}
-                {hotel.amenities.length > 3 && (
-                  <View style={styles.amenityBadge}>
-                    <Text style={styles.amenityText}>
-                      +{hotel.amenities.length - 3} more
-                    </Text>
-                  </View>
-                )}
-              </View>
-
-              <View style={styles.hotelFooter}>
-                <View style={styles.priceContainer}>
-                  <MaterialCommunityIcons
-                    name="cash"
-                    size={16}
-                    color="#1B73E8"
-                  />
-                  <Text style={styles.priceText}>{hotel.pricePerNight}/night</Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.viewButton}
-                  onPress={() => onNavigate("hotel-details", hotel)}
-                >
-                  <Text style={styles.viewButtonText}>View Details</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        ))}
-
         {filteredHotels.length === 0 && (
           <View style={styles.emptyState}>
             <MaterialCommunityIcons
@@ -174,9 +91,9 @@ export function ExploreHotels({ onNavigate, onBack }: ExploreHotelsProps) {
               size={64}
               color="#9CA3AF"
             />
-            <Text style={styles.emptyStateTitle}>No hotels found</Text>
+            <Text style={styles.emptyStateTitle}>Live hotel discovery not connected yet</Text>
             <Text style={styles.emptyStateSubtitle}>
-              Try adjusting your search or filters
+              The demo hotel list has been removed. Connect a real public hotel endpoint to show listings here.
             </Text>
           </View>
         )}
