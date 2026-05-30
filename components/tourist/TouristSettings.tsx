@@ -17,6 +17,13 @@ import {
 } from "react-native";
 import { authAPI, touristAPI } from "../../constants/api";
 import { TouristTopBar } from "../common/TouristTopBar";
+import {
+  createSavedCollection,
+  DEFAULT_COLLECTION_ID,
+  loadSavedCollections,
+  SavedCollection,
+  SavedCollectionItem,
+} from "./savedCollections";
 
 interface TouristSettingsProps {
   onBack: () => void;
@@ -39,13 +46,6 @@ interface SavedPlace {
   location?: string;
 }
 
-interface SavedCollection {
-  id: string;
-  title: string;
-  itemsCount: number;
-  createdAt: string;
-}
-
 type ProfileFieldKey = "fullName" | "username" | "phone" | "emergencyContact" | "preferences";
 
 const PAYMENT_OPTIONS = [
@@ -62,30 +62,13 @@ const TOURIST_PREFERENCES = [
   "Mountain",
 ];
 
-const COLLECTION_STORAGE_PREFIX = "tourist_saved_collections";
 const PHOTO_STORAGE_PREFIX = "tourist_profile_photo";
-
-const getCollectionsStorageKey = (userId: number | null) =>
-  `${COLLECTION_STORAGE_PREFIX}_${userId ?? "guest"}`;
 
 const getPhotoStorageKey = (userId: number | null) =>
   `${PHOTO_STORAGE_PREFIX}_${userId ?? "guest"}`;
 
 const getWebStorage = () =>
   typeof window !== "undefined" && window.localStorage ? window.localStorage : null;
-
-const parseSavedCollections = (value: string | null): SavedCollection[] => {
-  if (!value) {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-};
 
 const showSuccessMessage = (title: string, message: string) => {
   if (Platform.OS === "web" && typeof window !== "undefined") {
@@ -136,31 +119,7 @@ export function TouristSettings({ onBack, initialTab = "profile" }: TouristSetti
     privacy: "Privacy & Security",
   };
 
-  const collectionStorageKey = useMemo(() => getCollectionsStorageKey(userId), [userId]);
   const photoStorageKey = useMemo(() => getPhotoStorageKey(userId), [userId]);
-
-  const readCollections = async (storageKey: string) => {
-    try {
-      const storedValue = await AsyncStorage.getItem(storageKey);
-      if (storedValue) {
-        return parseSavedCollections(storedValue);
-      }
-    } catch {
-      // Fall through to web storage fallback.
-    }
-
-    return parseSavedCollections(getWebStorage()?.getItem(storageKey) ?? null);
-  };
-
-  const persistCollections = async (storageKey: string, collections: SavedCollection[]) => {
-    const serialized = JSON.stringify(collections);
-
-    try {
-      await AsyncStorage.setItem(storageKey, serialized);
-    } catch {
-      getWebStorage()?.setItem(storageKey, serialized);
-    }
-  };
 
   const readPhoto = async (storageKey: string) => {
     try {
@@ -201,7 +160,7 @@ export function TouristSettings({ onBack, initialTab = "profile" }: TouristSetti
       const paymentData = paymentRes?.data || {};
       const savedData = savedRes?.data || {};
       const resolvedUserId = Number(currentUser?.user_id || currentUser?.id || profile?.user_id || 0) || null;
-      const collections = await readCollections(getCollectionsStorageKey(resolvedUserId));
+      const collections = await loadSavedCollections(resolvedUserId);
       const backendPhoto = String(profile?.profile_photo || currentUser?.profile_photo || "").trim();
       const photoUri = (await readPhoto(getPhotoStorageKey(resolvedUserId))) || backendPhoto;
 
@@ -228,6 +187,7 @@ export function TouristSettings({ onBack, initialTab = "profile" }: TouristSetti
       setPaymentMethods(Array.isArray(paymentData?.methods) ? paymentData.methods : []);
       setSavedPlaces(Array.isArray(savedData?.places) ? savedData.places : []);
       setSavedCollections(collections);
+      setSelectedCollectionId((current) => current || collections[0]?.id || DEFAULT_COLLECTION_ID);
 
       if (profileResult.status === "rejected") {
         console.error("Tourist settings profile load failed:", profileResult.reason);
@@ -340,26 +300,17 @@ export function TouristSettings({ onBack, initialTab = "profile" }: TouristSetti
       return;
     }
 
-    const nextCollections = [
-      {
-        id: `collection_${Date.now()}`,
-        title,
-        itemsCount: 0,
-        createdAt: new Date().toISOString(),
-      },
-      ...savedCollections,
-    ];
-
+    const nextCollections = await createSavedCollection(userId, title);
     setSavedCollections(nextCollections);
-    setSelectedCollectionId(nextCollections[0].id);
+    setSelectedCollectionId(nextCollections.find((collection) => collection.title === title)?.id || nextCollections[0]?.id || DEFAULT_COLLECTION_ID);
     setCollectionName("");
     setShowCollectionCreator(false);
-    await persistCollections(collectionStorageKey, nextCollections);
     showSuccessMessage("Changes Saved", "Your new collection has been created.");
   };
 
   const selectedCollection =
     savedCollections.find((collection) => collection.id === selectedCollectionId) || null;
+  const selectedCollectionItems: SavedCollectionItem[] = selectedCollection?.items || [];
 
   const togglePaymentMethod = async (optionLabel: string) => {
     const existingMethod = paymentMethods.find(
@@ -745,7 +696,7 @@ export function TouristSettings({ onBack, initialTab = "profile" }: TouristSetti
                     <MaterialCommunityIcons name="folder" size={26} color="#1B73E8" />
                   </View>
                   <Text style={styles.collectionTitle}>{collection.title}</Text>
-                  <Text style={styles.collectionMeta}>{collection.itemsCount} saved items</Text>
+                  <Text style={styles.collectionMeta}>{collection.items.length} saved items</Text>
                 </TouchableOpacity>
               ))}
               {savedCollections.length === 0 ? (
@@ -773,10 +724,26 @@ export function TouristSettings({ onBack, initialTab = "profile" }: TouristSetti
                   </TouchableOpacity>
                 </View>
                 <Text style={styles.itemSubtitle}>
-                  {selectedCollection.itemsCount > 0
-                    ? `${selectedCollection.itemsCount} saved items in this collection.`
-                    : "This collection is empty for now. You can start organizing saved places and guides here next."}
+                  {selectedCollectionItems.length > 0
+                    ? `${selectedCollectionItems.length} saved items in this collection.`
+                    : "This collection is empty for now. You can start organizing saved places, guides, and hotels here next."}
                 </Text>
+                {selectedCollectionItems.length > 0 ? (
+                  <View style={styles.collectionItemsList}>
+                    {selectedCollectionItems.map((item) => (
+                      <View key={`${item.entityType}_${item.entityId}`} style={styles.collectionItemRow}>
+                        <View style={styles.collectionItemTextWrap}>
+                          <Text style={styles.itemTitle}>{item.title}</Text>
+                          <Text style={styles.itemSubtitle}>
+                            {[item.entityType.charAt(0).toUpperCase() + item.entityType.slice(1), item.subtitle]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
               </View>
             ) : null}
 
@@ -1071,6 +1038,20 @@ const styles = StyleSheet.create({
     borderColor: "#DBEAFE",
     backgroundColor: "#F8FAFC",
     padding: 14,
+  },
+  collectionItemsList: {
+    marginTop: 12,
+    gap: 8,
+  },
+  collectionItemRow: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    padding: 10,
+    backgroundColor: "#FFFFFF",
+  },
+  collectionItemTextWrap: {
+    flex: 1,
   },
   emptyStateCard: {
     width: "100%",

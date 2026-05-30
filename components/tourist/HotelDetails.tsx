@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     Alert,
     Image,
@@ -10,7 +10,15 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { authAPI } from '../../constants/api';
 import { TouristTopBar } from '../common/TouristTopBar';
+import { SaveToCollectionModal } from './SaveToCollectionModal';
+import {
+  isItemSaved,
+  loadSavedCollections,
+  SavedCollection,
+  saveItemToCollections,
+} from './savedCollections';
 
 interface Hotel {
   id: string;
@@ -36,6 +44,11 @@ export function HotelDetails({ hotel, onBack, onBook }: HotelDetailsProps) {
   const [checkInDate, setCheckInDate] = useState('');
   const [checkOutDate, setCheckOutDate] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [userId, setUserId] = useState<number | null>(null);
+  const [savedCollections, setSavedCollections] = useState<SavedCollection[]>([]);
+  const [saveModalVisible, setSaveModalVisible] = useState(false);
+  const [savingToCollection, setSavingToCollection] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   // Generate available dates for the next 30 days
   const generateAvailableDates = () => {
@@ -50,6 +63,19 @@ export function HotelDetails({ hotel, onBack, onBook }: HotelDetailsProps) {
   };
 
   const availableDates = generateAvailableDates();
+
+  useEffect(() => {
+    const loadSaveState = async () => {
+      const currentUser = await authAPI.getCurrentUser();
+      const resolvedUserId = Number(currentUser?.user_id || currentUser?.id || 0) || null;
+      const collections = await loadSavedCollections(resolvedUserId);
+      setUserId(resolvedUserId);
+      setSavedCollections(collections);
+      setSaved(isItemSaved(collections, 'hotel', String(hotel.id)));
+    };
+
+    void loadSaveState();
+  }, [hotel.id]);
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -106,6 +132,29 @@ export function HotelDetails({ hotel, onBack, onBook }: HotelDetailsProps) {
     });
   };
 
+  const handleSaveHotel = async (collectionId: string) => {
+    setSavingToCollection(true);
+    try {
+      const collections = await saveItemToCollections(userId, collectionId, {
+        id: `hotel_${hotel.id}`,
+        entityId: String(hotel.id),
+        entityType: 'hotel',
+        title: hotel.name,
+        subtitle: hotel.location,
+        image: hotel.image,
+        savedAt: new Date().toISOString(),
+      });
+      setSavedCollections(collections);
+      setSaved(true);
+      setSaveModalVisible(false);
+      Alert.alert('Saved', 'This hotel has been added to your selected collection and Saved folder.');
+    } catch (error: any) {
+      Alert.alert('Save Failed', error?.message || 'Unable to save this hotel right now.');
+    } finally {
+      setSavingToCollection(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <TouristTopBar title={hotel.name} subtitle={hotel.location} onBack={onBack} />
@@ -150,9 +199,18 @@ export function HotelDetails({ hotel, onBack, onBook }: HotelDetailsProps) {
           <View style={styles.section}>
             <View style={styles.titleRow}>
               <Text style={styles.hotelName}>{hotel.name}</Text>
-              <View style={styles.ratingContainer}>
-                <MaterialCommunityIcons name="star" size={20} color="#FFC107" />
-                <Text style={styles.ratingText}>{hotel.rating}</Text>
+              <View style={styles.titleActions}>
+                <View style={styles.ratingContainer}>
+                  <MaterialCommunityIcons name="star" size={20} color="#FFC107" />
+                  <Text style={styles.ratingText}>{hotel.rating}</Text>
+                </View>
+                <TouchableOpacity style={styles.saveIconButton} onPress={() => setSaveModalVisible(true)}>
+                  <MaterialCommunityIcons
+                    name={saved ? 'bookmark' : 'bookmark-outline'}
+                    size={20}
+                    color="#1B73E8"
+                  />
+                </TouchableOpacity>
               </View>
             </View>
             <View style={styles.locationRow}>
@@ -321,6 +379,14 @@ export function HotelDetails({ hotel, onBack, onBook }: HotelDetailsProps) {
           </Text>
         </TouchableOpacity>
       </View>
+
+      <SaveToCollectionModal
+        visible={saveModalVisible}
+        collections={savedCollections}
+        saving={savingToCollection}
+        onClose={() => setSaveModalVisible(false)}
+        onSelect={(collectionId) => void handleSaveHotel(collectionId)}
+      />
     </View>
   );
 }
@@ -433,6 +499,11 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 8,
   },
+  titleActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   hotelName: {
     flex: 1,
     fontSize: 28,
@@ -453,6 +524,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#1F2937',
+  },
+  saveIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
   },
   locationRow: {
     flexDirection: 'row',

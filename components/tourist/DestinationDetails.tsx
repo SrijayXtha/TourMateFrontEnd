@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     Alert,
     Image,
@@ -10,7 +10,15 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { authAPI } from '../../constants/api';
 import { TouristTopBar } from '../common/TouristTopBar';
+import { SaveToCollectionModal } from './SaveToCollectionModal';
+import {
+  isItemSaved,
+  loadSavedCollections,
+  SavedCollection,
+  saveItemToCollections,
+} from './savedCollections';
 
 interface Destination {
   id: string;
@@ -35,6 +43,11 @@ interface DestinationDetailsProps {
 }
 
 export function DestinationDetails({ destination, onBack, onNavigate }: DestinationDetailsProps) {
+  const [userId, setUserId] = useState<number | null>(null);
+  const [savedCollections, setSavedCollections] = useState<SavedCollection[]>([]);
+  const [saveModalVisible, setSaveModalVisible] = useState(false);
+  const [savingToCollection, setSavingToCollection] = useState(false);
+  const [saved, setSaved] = useState(false);
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
       case 'Easy':
@@ -58,6 +71,19 @@ export function DestinationDetails({ destination, onBack, onNavigate }: Destinat
   const availableGuides: any[] = [];
   const nearbyHotels: any[] = [];
 
+  useEffect(() => {
+    const loadSaveState = async () => {
+      const currentUser = await authAPI.getCurrentUser();
+      const resolvedUserId = Number(currentUser?.user_id || currentUser?.id || 0) || null;
+      const collections = await loadSavedCollections(resolvedUserId);
+      setUserId(resolvedUserId);
+      setSavedCollections(collections);
+      setSaved(isItemSaved(collections, 'destination', String(destination.id)));
+    };
+
+    void loadSaveState();
+  }, [destination.id]);
+
   const handleExploreHotels = () => {
     Alert.alert(
       'Browse Hotels',
@@ -77,13 +103,38 @@ export function DestinationDetails({ destination, onBack, onNavigate }: Destinat
     });
   };
 
+  const handleSaveDestination = async (collectionId: string) => {
+    setSavingToCollection(true);
+    try {
+      const collections = await saveItemToCollections(userId, collectionId, {
+        id: `destination_${destination.id}`,
+        entityId: String(destination.id),
+        entityType: 'destination',
+        title: destination.name,
+        subtitle: destination.location,
+        image: destination.image,
+        savedAt: new Date().toISOString(),
+      });
+      setSavedCollections(collections);
+      setSaved(true);
+      setSaveModalVisible(false);
+      Alert.alert('Saved', 'This destination has been added to your selected collection and Saved folder.');
+    } catch (error: any) {
+      Alert.alert('Save Failed', error?.message || 'Unable to save this destination right now.');
+    } finally {
+      setSavingToCollection(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
-      <TouristTopBar
-        title={destination.name}
-        subtitle={destination.location}
-        onBack={onBack}
-      />
+      <View style={styles.headerWrap}>
+        <TouristTopBar
+          title={destination.name}
+          subtitle={destination.location}
+          onBack={onBack}
+        />
+      </View>
 
       {/* Content */}
       <ScrollView
@@ -117,9 +168,18 @@ export function DestinationDetails({ destination, onBack, onNavigate }: Destinat
           <View style={styles.section}>
             <View style={styles.titleRow}>
               <Text style={styles.title}>{destination.name}</Text>
-              <View style={styles.ratingBadge}>
-                <MaterialCommunityIcons name="star" size={20} color="#FFC107" />
-                <Text style={styles.ratingText}>{destination.rating}</Text>
+              <View style={styles.titleActions}>
+                <View style={styles.ratingBadge}>
+                  <MaterialCommunityIcons name="star" size={20} color="#FFC107" />
+                  <Text style={styles.ratingText}>{destination.rating}</Text>
+                </View>
+                <TouchableOpacity style={styles.saveIconButton} onPress={() => setSaveModalVisible(true)}>
+                  <MaterialCommunityIcons
+                    name={saved ? 'bookmark' : 'bookmark-outline'}
+                    size={20}
+                    color="#1B73E8"
+                  />
+                </TouchableOpacity>
               </View>
             </View>
             <View style={styles.locationRow}>
@@ -343,6 +403,14 @@ export function DestinationDetails({ destination, onBack, onNavigate }: Destinat
           <View style={{ height: 20 }} />
         </View>
       </ScrollView>
+
+      <SaveToCollectionModal
+        visible={saveModalVisible}
+        collections={savedCollections}
+        saving={savingToCollection}
+        onClose={() => setSaveModalVisible(false)}
+        onSelect={(collectionId) => void handleSaveDestination(collectionId)}
+      />
     </View>
   );
 }
@@ -352,17 +420,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F9FAFB',
   },
+  headerWrap: {
+    zIndex: 20,
+    elevation: 20,
+  },
   imageContainer: {
     position: 'relative',
-    marginTop: 0,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    overflow: 'hidden',
-    backgroundColor: '#1B73E8',
+    marginTop: -40,
   },
   headerImage: {
     width: '100%',
-    height: 256,
+    height: 328,
   },
   backButton: {
     position: 'absolute',
@@ -379,7 +447,7 @@ const styles = StyleSheet.create({
   },
   difficultyBadge: {
     position: 'absolute',
-    top: 24,
+    top: 56,
     right: 24,
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -390,12 +458,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   content: {
+    paddingTop: 32,
     paddingBottom: 20,
   },
   contentScroll: {
-    marginTop: 0,
+    marginTop: -32,
+    backgroundColor: '#1B73E8',
   },
   contentPadding: {
+    backgroundColor: '#F9FAFB',
     paddingHorizontal: 16,
     paddingTop: 16,
   },
@@ -407,6 +478,11 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     marginBottom: 8,
+  },
+  titleActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   title: {
     flex: 1,
@@ -428,6 +504,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#1F2937',
+  },
+  saveIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
   },
   locationRow: {
     flexDirection: 'row',

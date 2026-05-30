@@ -474,9 +474,10 @@ export const authAPI = {
   },
 
   getCurrentUser: async () => {
-    const user = await TokenManager.getUser();
-    await syncRealtimeIdentity({ user });
-    return user;
+    // Reading the stored auth user should stay local-only.
+    // Realtime chat/Firebase sync is handled during auth flows and chat usage,
+    // so ordinary profile/detail screens do not trigger Firestore requests.
+    return await TokenManager.getUser();
   },
 
   isAuthenticated: async () => {

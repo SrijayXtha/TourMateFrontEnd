@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     Alert,
     Image,
@@ -12,7 +12,15 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { authAPI } from '../../constants/api';
 import { TouristTopBar } from '../common/TouristTopBar';
+import { SaveToCollectionModal } from './SaveToCollectionModal';
+import {
+  isItemSaved,
+  loadSavedCollections,
+  SavedCollection,
+  saveItemToCollections,
+} from './savedCollections';
 
 interface Review {
   user: string;
@@ -53,6 +61,11 @@ export function GuideProfile({ guide, onBack, onBook, onMessage }: GuideProfileP
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
   const [activeDateField, setActiveDateField] = useState<'start' | 'end'>('start');
+  const [userId, setUserId] = useState<number | null>(null);
+  const [savedCollections, setSavedCollections] = useState<SavedCollection[]>([]);
+  const [saveModalVisible, setSaveModalVisible] = useState(false);
+  const [savingToCollection, setSavingToCollection] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -97,6 +110,37 @@ export function GuideProfile({ guide, onBack, onBook, onMessage }: GuideProfileP
   };
 
   const minimumEndDate = addDays(startDateValue || today, minimumDurationDays);
+
+  const experienceLabel = (() => {
+    const rawValue = String(guide.experience || '').trim();
+    if (!rawValue) {
+      return 'Experience not specified';
+    }
+
+    const lowerValue = rawValue.toLowerCase();
+    if (
+      lowerValue.includes('experience') ||
+      lowerValue.endsWith('exp') ||
+      lowerValue.includes('year')
+    ) {
+      return rawValue;
+    }
+
+    return `${rawValue} experience`;
+  })();
+
+  useEffect(() => {
+    const loadSaveState = async () => {
+      const currentUser = await authAPI.getCurrentUser();
+      const resolvedUserId = Number(currentUser?.user_id || currentUser?.id || 0) || null;
+      const collections = await loadSavedCollections(resolvedUserId);
+      setUserId(resolvedUserId);
+      setSavedCollections(collections);
+      setSaved(isItemSaved(collections, 'guide', String(guide.id)));
+    };
+
+    void loadSaveState();
+  }, [guide.id]);
 
   const handleMessageGuide = () => {
     if (onMessage) {
@@ -143,6 +187,29 @@ export function GuideProfile({ guide, onBack, onBook, onMessage }: GuideProfileP
       url: shareLink,
       title: `${guide.name} - TourMate`,
     });
+  };
+
+  const handleSaveGuide = async (collectionId: string) => {
+    setSavingToCollection(true);
+    try {
+      const collections = await saveItemToCollections(userId, collectionId, {
+        id: `guide_${guide.id}`,
+        entityId: String(guide.id),
+        entityType: 'guide',
+        title: guide.name,
+        subtitle: guide.location || guide.destinations?.map((destination) => destination.name).join(', '),
+        image: guide.photo,
+        savedAt: new Date().toISOString(),
+      });
+      setSavedCollections(collections);
+      setSaved(true);
+      setSaveModalVisible(false);
+      Alert.alert('Saved', 'This guide has been added to your selected collection and Saved folder.');
+    } catch (error: any) {
+      Alert.alert('Save Failed', error?.message || 'Unable to save this guide right now.');
+    } finally {
+      setSavingToCollection(false);
+    }
   };
 
   const formatInputDate = (dateStr: string) => {
@@ -202,10 +269,13 @@ export function GuideProfile({ guide, onBack, onBook, onMessage }: GuideProfileP
   return (
     <View style={styles.container}>
       {/* Header */}
-      <TouristTopBar title={guide.name} subtitle="Guide Profile" onBack={onBack} />
+      <View style={styles.headerWrap}>
+        <TouristTopBar title={guide.name} subtitle="Guide Profile" onBack={onBack} />
+      </View>
 
       {/* Content */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {false ? (
         <View style={styles.compactProfileCard}>
           <Image
             source={typeof guide.photo === 'string' ? { uri: guide.photo } : guide.photo}
@@ -224,6 +294,7 @@ export function GuideProfile({ guide, onBack, onBook, onMessage }: GuideProfileP
             <MaterialCommunityIcons name="check-circle" size={18} color="#2BC7B2" />
           ) : null}
         </View>
+        ) : null}
 
         {/* Profile Card */}
         <View style={styles.profileCard}>
@@ -238,18 +309,29 @@ export function GuideProfile({ guide, onBack, onBook, onMessage }: GuideProfileP
                 {guide.verified && (
                   <MaterialCommunityIcons name="check-circle" size={20} color="#2BC7B2" />
                 )}
+                <TouchableOpacity
+                  style={styles.saveIconButton}
+                  onPress={() => setSaveModalVisible(true)}
+                >
+                  <MaterialCommunityIcons
+                    name={saved ? 'bookmark' : 'bookmark-outline'}
+                    size={20}
+                    color="#1B73E8"
+                  />
+                </TouchableOpacity>
               </View>
-              
-              <View style={styles.statsRow}>
-                <MaterialCommunityIcons name="star" size={16} color="#FFC107" />
-                <Text style={styles.statsText}>
-                  {guide.rating} ({guide.reviews?.length || 0} reviews)
-                </Text>
-              </View>
-              
-              <View style={styles.experienceRow}>
-                <MaterialCommunityIcons name="trophy" size={16} color="#666" />
-                <Text style={styles.experienceText}>{guide.experience} experience</Text>
+
+              <View style={styles.metaPills}>
+                <View style={styles.metaPill}>
+                  <MaterialCommunityIcons name="star" size={14} color="#FFC107" />
+                  <Text style={styles.metaPillText}>
+                    {guide.rating} ({guide.reviews?.length || 0} reviews)
+                  </Text>
+                </View>
+                <View style={styles.metaPill}>
+                  <MaterialCommunityIcons name="trophy-outline" size={14} color="#6B7280" />
+                  <Text style={styles.metaPillText}>{experienceLabel}</Text>
+                </View>
               </View>
             </View>
           </View>
@@ -314,7 +396,7 @@ export function GuideProfile({ guide, onBack, onBook, onMessage }: GuideProfileP
           <View style={styles.pricingCard}>
             <View style={styles.pricingRow}>
               <View style={styles.pricingLabel}>
-                <MaterialCommunityIcons name="currency-usd" size={20} color="#1B73E8" />
+                <MaterialCommunityIcons name="cash" size={20} color="#1B73E8" />
                 <Text style={styles.pricingText}>Price per day</Text>
               </View>
               <Text style={styles.priceAmount}>{guide.pricePerDay}</Text>
@@ -459,6 +541,14 @@ export function GuideProfile({ guide, onBack, onBook, onMessage }: GuideProfileP
           <Text style={styles.bookButtonText}>Book Now</Text>
         </TouchableOpacity>
       </View>
+
+      <SaveToCollectionModal
+        visible={saveModalVisible}
+        collections={savedCollections}
+        saving={savingToCollection}
+        onClose={() => setSaveModalVisible(false)}
+        onSelect={(collectionId) => void handleSaveGuide(collectionId)}
+      />
     </View>
   );
 }
@@ -467,6 +557,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
+    position: 'relative',
+  },
+  headerWrap: {
+    zIndex: 20,
+    elevation: 20,
+    overflow: 'hidden',
   },
   header: {
     backgroundColor: '#1B73E8',
@@ -487,49 +583,8 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 16,
-    marginTop: -16,
-  },
-  compactProfileCard: {
-    marginTop: 12,
-    marginBottom: 12,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  compactProfileImage: {
-    width: 54,
-    height: 54,
-    borderRadius: 10,
-  },
-  compactProfileInfo: {
-    flex: 1,
-    marginLeft: 10,
-  },
-  compactProfileName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 3,
-  },
-  compactMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  compactMetaText: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  compactMetaDot: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    marginHorizontal: 2,
+    marginTop: -4,
+    zIndex: 1,
   },
   profileCard: {
     backgroundColor: '#fff',
@@ -546,46 +601,59 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 16,
     marginBottom: 16,
+    alignItems: 'flex-start',
   },
   profileImage: {
-    width: 96,
-    height: 96,
+    width: 84,
+    height: 84,
     borderRadius: 16,
   },
   profileInfo: {
     flex: 1,
+    paddingTop: 2,
   },
   nameContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 8,
-    marginBottom: 8,
+    marginBottom: 10,
+  },
+  saveIconButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EFF6FF',
   },
   name: {
-    fontSize: 24,
+    fontSize: 20,
+    lineHeight: 28,
     fontWeight: 'bold',
     color: '#000',
     flexWrap: 'wrap',
     flex: 1,
   },
-  statsRow: {
+  metaPills: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  metaPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginBottom: 8,
+    gap: 6,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
-  statsText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  experienceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  experienceText: {
-    fontSize: 14,
-    color: '#666',
+  metaPillText: {
+    fontSize: 13,
+    color: '#4B5563',
+    fontWeight: '500',
   },
   section: {
     marginBottom: 16,

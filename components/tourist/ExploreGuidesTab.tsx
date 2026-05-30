@@ -36,11 +36,6 @@ interface GuideCard {
   specialization?: string;
 }
 
-interface DestinationOption {
-  destinationId: number;
-  name: string;
-}
-
 const GUIDE_FALLBACK_IMAGES = [
   "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&q=80",
   "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=600&q=80",
@@ -79,30 +74,24 @@ const toGuideCard = (guide: any, index: number): GuideCard => {
 
 export function ExploreGuidesTab({ onNavigate }: ExploreGuidesTabProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedDestinationId, setSelectedDestinationId] = useState<number | null>(null);
-  const [selectedLanguage, setSelectedLanguage] = useState("");
-  const [selectedSpecialization, setSelectedSpecialization] = useState("");
+  const [selectedTheme, setSelectedTheme] = useState("All");
   const [ratingOnly, setRatingOnly] = useState(false);
   const [guides, setGuides] = useState<GuideCard[]>([]);
-  const [destinations, setDestinations] = useState<DestinationOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorText, setErrorText] = useState("");
+
+  const themeFilters = ["All", "Heritage", "Mountain", "Nature", "Trekking", "Cultural"];
 
   useEffect(() => {
     const loadGuides = async () => {
       try {
         setLoading(true);
         setErrorText("");
-        const [guideResponse, destinationResponse] = await Promise.all([
-          publicAPI.getGuides({ page: 1, limit: 100 }),
-          publicAPI.getDestinations(),
-        ]);
+        const guideResponse = await publicAPI.getGuides({ page: 1, limit: 100 });
         const guideItems = ((guideResponse?.data?.guides || []) as any[]).map(toGuideCard);
         setGuides(guideItems);
-        setDestinations((destinationResponse?.data?.destinations || []) as DestinationOption[]);
       } catch (error: any) {
         setGuides([]);
-        setDestinations([]);
         setErrorText(error?.message || "Unable to load guides right now.");
       } finally {
         setLoading(false);
@@ -112,25 +101,12 @@ export function ExploreGuidesTab({ onNavigate }: ExploreGuidesTabProps) {
     void loadGuides();
   }, []);
 
-  const languageOptions = useMemo(() => {
-    return Array.from(new Set(guides.flatMap((guide) => guide.languages))).sort();
-  }, [guides]);
-
-  const specializationOptions = useMemo(() => {
-    return Array.from(
-      new Set(
-        guides
-          .map((guide) => guide.specialization || "")
-          .filter(Boolean)
-      )
-    ).sort();
-  }, [guides]);
-
   const filteredGuides = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
 
     return guides.filter((guide) => {
       const destinationNames = guide.destinations.map((destination) => destination.name);
+      const themeHaystack = [guide.specialization || "", ...destinationNames].join(" ").toLowerCase();
       const haystack = [
         guide.name,
         guide.bio || "",
@@ -142,55 +118,26 @@ export function ExploreGuidesTab({ onNavigate }: ExploreGuidesTabProps) {
         .toLowerCase();
 
       const matchesQuery = !normalizedQuery || haystack.includes(normalizedQuery);
-      const matchesDestination =
-        !selectedDestinationId ||
-        guide.destinations.some(
-          (destination) => destination.destinationId === selectedDestinationId
-        );
-      const matchesLanguage =
-        !selectedLanguage ||
-        guide.languages.some(
-          (language) => language.toLowerCase() === selectedLanguage.toLowerCase()
-        );
-      const matchesSpecialization =
-        !selectedSpecialization ||
-        (guide.specialization || "")
-          .toLowerCase()
-          .includes(selectedSpecialization.toLowerCase());
+      const matchesTheme =
+        selectedTheme === "All" ||
+        themeHaystack.includes(selectedTheme.toLowerCase());
       const matchesRating = !ratingOnly || guide.rating >= 4.5;
 
-      return (
-        matchesQuery &&
-        matchesDestination &&
-        matchesLanguage &&
-        matchesSpecialization &&
-        matchesRating
-      );
+      return matchesQuery && matchesTheme && matchesRating;
     });
-  }, [
-    guides,
-    ratingOnly,
-    searchQuery,
-    selectedDestinationId,
-    selectedLanguage,
-    selectedSpecialization,
-  ]);
+  }, [guides, ratingOnly, searchQuery, selectedTheme]);
 
   const emptyStateText = useMemo(() => {
     if (errorText) {
       return errorText;
     }
 
-    if (selectedDestinationId || /pokhara|kathmandu|lumbini|chitwan|mustang|bandipur/i.test(searchQuery)) {
+    if (/pokhara|kathmandu|lumbini|chitwan|mustang|bandipur|everest/i.test(searchQuery)) {
       return "No guides found for this destination.";
     }
 
-    if (selectedLanguage) {
-      return "No guides found for this language.";
-    }
-
     return "No guides matched your current search.";
-  }, [errorText, searchQuery, selectedDestinationId, selectedLanguage]);
+  }, [errorText, searchQuery]);
 
   return (
     <View style={styles.container}>
@@ -212,30 +159,28 @@ export function ExploreGuidesTab({ onNavigate }: ExploreGuidesTabProps) {
           style={styles.filtersScroll}
           contentContainerStyle={styles.filtersContent}
         >
-          <TouchableOpacity
-            style={[styles.filterChip, !selectedDestinationId && styles.filterChipMuted]}
-            onPress={() => setSelectedDestinationId(null)}
-          >
-            <Text style={styles.filterChipText}>
-              Destination{selectedDestinationId ? ": selected" : ""}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.filterChip, !selectedLanguage && styles.filterChipMuted]}
-            onPress={() => setSelectedLanguage("")}
-          >
-            <Text style={styles.filterChipText}>
-              Language{selectedLanguage ? `: ${selectedLanguage}` : ""}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.filterChip, !selectedSpecialization && styles.filterChipMuted]}
-            onPress={() => setSelectedSpecialization("")}
-          >
-            <Text style={styles.filterChipText}>
-              Specialization{selectedSpecialization ? ": selected" : ""}
-            </Text>
-          </TouchableOpacity>
+          {themeFilters.map((theme) => {
+            const selected = selectedTheme === theme;
+            return (
+              <TouchableOpacity
+                key={theme}
+                style={[
+                  styles.filterChip,
+                  selected ? styles.filterChipActive : styles.filterChipMuted,
+                ]}
+                onPress={() => setSelectedTheme(theme)}
+              >
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    selected && styles.filterChipTextActive,
+                  ]}
+                >
+                  {theme}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
           <TouchableOpacity
             style={[styles.filterChip, ratingOnly && styles.filterChipActive]}
             onPress={() => setRatingOnly((prev) => !prev)}
@@ -246,80 +191,6 @@ export function ExploreGuidesTab({ onNavigate }: ExploreGuidesTabProps) {
               Rating 4.5+
             </Text>
           </TouchableOpacity>
-        </ScrollView>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.optionRow}
-          contentContainerStyle={styles.filtersContent}
-        >
-          {destinations.slice(0, 12).map((destination) => {
-            const selected = selectedDestinationId === destination.destinationId;
-            return (
-              <TouchableOpacity
-                key={destination.destinationId}
-                style={[styles.optionChip, selected && styles.optionChipActive]}
-                onPress={() =>
-                  setSelectedDestinationId(selected ? null : destination.destinationId)
-                }
-              >
-                <Text
-                  style={[styles.optionChipText, selected && styles.optionChipTextActive]}
-                >
-                  {destination.name}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.optionRow}
-          contentContainerStyle={styles.filtersContent}
-        >
-          {languageOptions.slice(0, 10).map((language) => {
-            const selected = selectedLanguage === language;
-            return (
-              <TouchableOpacity
-                key={language}
-                style={[styles.optionChip, selected && styles.optionChipActive]}
-                onPress={() => setSelectedLanguage(selected ? "" : language)}
-              >
-                <Text
-                  style={[styles.optionChipText, selected && styles.optionChipTextActive]}
-                >
-                  {language}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.optionRow}
-          contentContainerStyle={styles.filtersContent}
-        >
-          {specializationOptions.slice(0, 10).map((specialization) => {
-            const selected = selectedSpecialization === specialization;
-            return (
-              <TouchableOpacity
-                key={specialization}
-                style={[styles.optionChip, selected && styles.optionChipActive]}
-                onPress={() => setSelectedSpecialization(selected ? "" : specialization)}
-              >
-                <Text
-                  style={[styles.optionChipText, selected && styles.optionChipTextActive]}
-                >
-                  {specialization}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
         </ScrollView>
       </View>
 
@@ -484,31 +355,6 @@ const styles = StyleSheet.create({
   },
   filterChipTextActive: {
     color: "#fff",
-  },
-  optionRow: {
-    marginTop: 10,
-  },
-  optionChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: "#F3F4F6",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    marginRight: 8,
-  },
-  optionChipActive: {
-    backgroundColor: "#DBEAFE",
-    borderColor: "#60A5FA",
-  },
-  optionChipText: {
-    color: "#4B5563",
-    fontSize: 12,
-    fontWeight: "500",
-  },
-  optionChipTextActive: {
-    color: "#1D4ED8",
-    fontWeight: "700",
   },
   guidesList: {
     flex: 1,
